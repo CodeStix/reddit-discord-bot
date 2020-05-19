@@ -15,9 +15,11 @@ const redditUrlTypes = ["hot", "random", "rising"];
 
 let downloadVideos = true;
 
-const tempFilePath = "./temp"; //path.join(__dirname, "temp");
+const videoCachePath = "./cache/video"; //path.join(__dirname, "temp");
+const youtubeDlCachePath = "./cache/youtube-dl";
+const youtubeDlMaxFileSize = "10M";
 
-// stijnvantvijfde@gmail.com 3vGrFAKTrvQg8UHh
+// Streamable account: stijnvantvijfde@gmail.com 3vGrFAKTrvQg8UHh
 
 console.log("Connecting to discord...");
 
@@ -26,11 +28,16 @@ bot.on("ready", () => {
     console.log("Connected.");
 });
 
+async function getAuthorIcon(authorName) {
+    // https://www.reddit.com/user/CodeStix/about.json
+    return `https://www.redditstatic.com/avatars/avatar_default_${Math.floor(Math.random() * 11) + 10}_DDBD37.png`;
+}
+
 /**
  * @param {TextChannel} channel
  * @param {string} url An url attachment for the reddit item.
  */
-async function sendUrlSpoiler(channel, url) {
+async function sendUrlSpoiler(channel, url, isVideo) {
     var message = await channel.send("Loading...");
 
     async function setStatus(status) {
@@ -53,6 +60,9 @@ async function sendUrlSpoiler(channel, url) {
             case "video":
                 await channel.send(new MessageAttachment(url, "SPOILER_.mp4"));
                 return;
+            default:
+                console.warn("Invalid sendAsSpoiler type.");
+                return;
         }
     }
 
@@ -64,22 +74,35 @@ async function sendUrlSpoiler(channel, url) {
         }
     }
 
-    if (downloadVideos && (url.startsWith("https://v.redd.it/") || url.startsWith("http://v.redd.it/"))) {
-        const videoUrlHash = crypto.createHash("sha1").update(url, "binary").digest("hex");
-        const tempVideoPath = path.join(tempFilePath, videoUrlHash + ".mp4");
+    if (!isVideo) {
+        isVideo =
+            url.startsWith("https://v.redd.it/") ||
+            url.startsWith("https://streamable.com/") ||
+            url.startsWith("https://youtube.com/") ||
+            url.startsWith("https://youtube-nocookie.com/") ||
+            url.startsWith("https://m.youtube.com/") ||
+            url.startsWith("https://youtu.be/");
+        if (isVideo) console.log("Info: did mark as video");
+    }
 
-        if (await existsAsync(tempVideoPath)) {
+    if (downloadVideos && isVideo) {
+        const videoUrlHash = crypto.createHash("sha1").update(url, "binary").digest("hex");
+        const videoPath = path.join(videoCachePath, videoUrlHash + ".mp4");
+
+        if (await existsAsync(videoPath)) {
             console.log("Info: using cached video");
             await setStatus("🖥️ Uploading video...");
-            await sendAsSpoiler(tempVideoPath, "video");
+            await sendAsSpoiler(videoPath, "video");
         } else {
             await setStatus("🎞️ Converting video...");
-            const { stdout, stderr } = await exec(`ffmpeg -i "${url + "/DASHPlaylist.mpd"}" "${tempVideoPath}"`);
+            const { stdout, stderr } = await exec(
+                `youtube-dl --max-filesize ${youtubeDlMaxFileSize} --cache-dir "${youtubeDlCachePath}" --no-playlist --retries 3 --output "${videoPath}" "${url}"`
+            );
 
-            if (await existsAsync(tempVideoPath)) {
+            if (await existsAsync(videoPath)) {
                 try {
                     await setStatus("🖥️ Uploading video...");
-                    await sendAsSpoiler(tempVideoPath, "video");
+                    await sendAsSpoiler(videoPath, "video");
                 } catch (ex) {
                     console.log("Warning: Could not upload video", ex);
                     await sendAsSpoiler(url, "other");
@@ -89,7 +112,7 @@ async function sendUrlSpoiler(channel, url) {
                 await sendAsSpoiler(url, "other");
             }
         }
-    } else if (url.startsWith("https://i.redd.it/") || url.startsWith("http://i.redd.it/")) {
+    } else if (url.startsWith("https://i.redd.it/") || url.startsWith("https://postimg.cc/")) {
         sendAsSpoiler(url, "image");
     } else {
         sendAsSpoiler(url, "other");
@@ -112,6 +135,8 @@ async function sendRandomRedditItem(channel, redditUrl) {
         } else {
             throw new Error("No items returned.");
         }
+
+        fs.writeFileSync("./badrequests/latest.json", JSON.stringify(response.data));
     } catch (ex) {
         console.log("Bad response from reddit url", ex.message);
 
@@ -121,13 +146,16 @@ async function sendRandomRedditItem(channel, redditUrl) {
         return;
     }
 
-    if (obj.selftext && obj.selftext.length > 2048) obj.selftext.splice(2048);
+    if (obj.selftext && obj.selftext.length > 2048) {
+        obj.selftext.splice(2048);
+        console.log("Warning: text was too long, spliced it");
+    }
 
     await channel.send(
         new MessageEmbed()
             .setTitle(obj.title)
             .setURL("https://reddit.com" + obj.permalink)
-            .setAuthor(obj.author, redditIcon, "https://reddit.com/u/" + obj.author)
+            .setAuthor(obj.author, await getAuthorIcon(obj.author), "https://reddit.com/u/" + obj.author)
             .setColor(obj.title.includes("NSF") ? "#ff1111" : "#11ff11")
             .setDescription(obj.selftext || "")
             .setTimestamp(obj.created * 1000)
@@ -135,32 +163,7 @@ async function sendRandomRedditItem(channel, redditUrl) {
 
     var url = decodeURI(obj.url).replace("&amp;", "&");
     console.log(obj.permalink, url);
-    sendUrlSpoiler(channel, url);
-}
-
-/**
- * @param {TextChannel} channel
- */
-async function sendFiftyFiftyList(channel) {
-    const redditUrl = "https://api.reddit.com/r/FiftyFifty/rising";
-
-    var items, response;
-    try {
-        response = await axios.get(redditUrl, { responseType: "json" });
-        items = response.data.data.children;
-    } catch (ex) {
-        console.log("Bad response from reddit url:", ex);
-        return;
-    }
-
-    var message = new MessageEmbed();
-
-    for (var i = 0; i < items.length; i++) {
-        message.addField(items[i].data.title, items[i].data.url);
-        console.log("item", i);
-    }
-
-    channel.send(message);
+    sendUrlSpoiler(channel, url, obj.is_video);
 }
 
 var previousSubreddits = {};
@@ -195,8 +198,6 @@ bot.on("message", (message) => {
     previousSubreddits[message.channel.id] = subredditName;
 
     const redditReturnType = redditUrlTypes[Math.floor(Math.random() * redditUrlTypes.length)];
-
-    console.log("using", redditReturnType);
 
     sendRandomRedditItem(message.channel, `https://api.reddit.com/${subredditName}/${redditReturnType}`);
 });

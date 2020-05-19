@@ -3,3 +3,4 @@ temp/
 badrequests/
 ff*.exe
 youtube-dl.exe
+cache/
