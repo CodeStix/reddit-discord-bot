@@ -4,3 +4,5 @@ badrequests/
 ff*.exe
 youtube-dl.exe
 cache/
+certs/
+bin/
