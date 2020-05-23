@@ -1,5 +1,4 @@
 const { Client, MessageAttachment, MessageEmbed, Message, TextChannel } = require("discord.js");
-const bot = new Client();
 const axios = require("axios").default;
 const util = require("util");
 const path = require("path");
@@ -7,8 +6,13 @@ const http = require("http");
 const fs = require("fs");
 const crypto = require("crypto");
 const cheerio = require("cheerio");
-const express = require("express");
+const redis = require("redis");
 
+const bot = new Client();
+const redisClient = redis.createClient({ host: "127.0.0.1", port: 6379, enable_offline_queue: false });
+
+const getAsync = util.promisify(redisClient.get).bind(redisClient);
+const setexAsync = util.promisify(redisClient.setex).bind(redisClient);
 const existsAsync = util.promisify(fs.exists);
 const statAsync = util.promisify(fs.stat);
 const renameAsync = util.promisify(fs.rename);
@@ -29,6 +33,19 @@ let minimumVotes = 1;
 let defaultSubredditMethod = "top"; // hot | rising | top | new
 
 const videosPath = path.join(__dirname, "cache", "video");
+
+redisClient.once("ready", async () => {
+    console.log("[Redis] Connected");
+
+    const res = await getAsync("test");
+    console.log(res);
+});
+redisClient.on("error", (err) => {
+    console.error("[Redis/Error]", err);
+});
+redisClient.on("warning", (warn) => {
+    console.warn("[Redis/Warning]", warn);
+});
 
 function decodeHtmlEscaping(str) {
     return str.replace("&amp;", "&").replace("&quot;", '"').replace("&lt;", "<").replace("&gt;", ">");
@@ -87,12 +104,14 @@ async function getAuthorAvatarUrl(authorName) {
  * @param {string} url An url attachment for the reddit item.
  */
 async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) {
-    var currentStatusAwaiter = channel.send("Loading...").catch((err) => {
+    url = encodeURI(url);
+    console.log(url);
+    /*var currentStatusAwaiter = channel.send("Loading...").catch((err) => {
         console.warn("Warning: could not set status:", err);
-    });
+    });*/
 
     function setStatus(status) {
-        currentStatusAwaiter.then((m) => (status ? m.edit(status) : m.delete()));
+        // currentStatusAwaiter.then((m) => (status ? m.edit(status) : m.delete()));
     }
 
     /**
@@ -106,8 +125,8 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
                 else channel.send(url);
                 break;
             case "pngImage":
-                if (markSpoiler) channel.send(new MessageAttachment(url, "SPOILER_.png"));
-                else channel.send(new MessageAttachment(url, "image.png"));
+                if (markSpoiler) channel.send(new MessageAttachment(url, "SPOILER_.gif"));
+                else channel.send(new MessageAttachment(url, "image.gif"));
                 break;
             case "video":
                 if (markSpoiler) channel.send(new MessageAttachment(url, "SPOILER_.mp4"));
@@ -130,11 +149,20 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
     if (url.startsWith("https://imgur.com/")) {
         url = "https://i.imgur.com/" + url.substring("https://imgur.com/".length);
         console.log("Info: Extracted imgur url");
+    } else if (url.startsWith("https://postimg.cc/")) {
+        try {
+            const response = await axios.get(url);
+            const ch = cheerio.load(response.data);
+            url = ch("head meta[property='og:image']").attr("content");
+            console.log("Info: Extracted postimg.cc url", url);
+        } catch (ex) {
+            console.log("Warning: could not extract postimg.cc image", ex.message);
+        }
     }
 
     if (!tryConvertVideo) {
         if (
-            url.endsWith(".gif") ||
+            //url.endsWith(".gif") ||
             url.endsWith(".gifv") ||
             url.endsWith(".mp4") ||
             url.startsWith("https://v.redd.it/") ||
@@ -145,19 +173,8 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
             (url.startsWith("https://imgur.com/") && url.endsWith(".mp4"))*/
         ) {
             tryConvertVideo = true;
-        } else if (url.startsWith("https://postimg.cc/")) {
-            try {
-                const response = await axios.get(url);
-                const ch = cheerio.load(response.data);
-                url = ch("head meta[property='og:image']").attr("content");
-                console.log("Info: Extracted postimg.cc url", url);
-            } catch (ex) {
-                console.log("Warning: could not extract postimg.cc image", ex.message);
-            }
         }
     }
-
-    console.log(url);
 
     if (downloadVideos && tryConvertVideo) {
         const videoUrlHash = crypto.createHash("sha1").update(url, "binary").digest("hex");
@@ -166,13 +183,13 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
         try {
             if (await existsAsync(videoFile)) {
                 sendAs(videoFile, "video");
-                //var videoInfo = JSON.parse((await exec(`ffprobe -i "${videoFile}" -v quiet -print_format json -show_format -hide_banner`)).stdout);
-                //console.log("probe", videoInfo);
+                //console.log("probe", JSON.parse((await exec(`ffprobe -i "${videoFile}" -v quiet -print_format json -show_format -hide_banner`)).stdout));
             } else {
                 setStatus("🎥 Converting video for the first time ...");
                 const tempVideoFile = videoFile + ".temp.mp4";
+                // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
                 const { stdout, stderr } = await execAsync(
-                    `youtube-dl.exe --max-filesize 100M --no-playlist --retries 3 --output "${tempVideoFile}" "${url}"`, // --max-filesize ${youtubeDlMaxFileSize}  --exec "move {} \"${tempVideoFile}\"" --cache-dir "${youtubeDlCachePath}"
+                    `youtube-dl.exe -f "best[filesize<8M]/(bestvideo[width<=800]+bestaudio)[filesize<8M]/worstvideo[width>=480]+bestaudio/best" --no-playlist --retries 3 --output "${tempVideoFile}" "${url}"`, // --max-filesize ${youtubeDlMaxFileSize}  --exec "move {} \"${tempVideoFile}\"" --cache-dir "${youtubeDlCachePath}"
                     execOptions
                 );
 
@@ -234,7 +251,9 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
     } else if (
         url.startsWith("https://i.redd.it/") ||
         url.startsWith("https://i.postimg.cc/") ||
-        (url.startsWith("https://i.imgur.com/") && (url.endsWith("png") || url.endsWith("jpg"))) /*|| url.startsWith("https://gfycat.com/")*/
+        url.endsWith(".gif") ||
+        /*url.startsWith("https://i.imgur.com/") && */ url.endsWith(".png") ||
+        url.endsWith(".jpg") /*|| url.startsWith("https://gfycat.com/")*/
     ) {
         try {
             sendAs(url, "pngImage");
@@ -308,9 +327,13 @@ async function sendRedditItem(channel, subredditName, redditItem) {
 
     const message = await channel.send(
         new MessageEmbed()
-            .setTitle(decodeHtmlEscaping(redditItem.title))
+            .setTitle(decodeHtmlEscaping(redditItem.title || "[no title]"))
             .setURL(fullLink)
-            .setAuthor(decodeHtmlEscaping(redditItem.author), await getAuthorAvatarUrl(redditItem.author), "https://reddit.com/u/" + redditItem.author)
+            .setAuthor(
+                decodeHtmlEscaping(redditItem.author || "[deleted]"),
+                await getAuthorAvatarUrl(redditItem.author),
+                "https://reddit.com/u/" + redditItem.author
+            )
             .setColor(nsfw ? "#ff1111" : "#11ff11")
             .setDescription((redditItem.hide_score ? "⏺️" : numberToEmoijNumber(redditItem.score)) + "\n" + decodeHtmlEscaping(redditItem.selftext || ""))
             .setTimestamp(redditItem.created * 1000)
@@ -431,7 +454,7 @@ bot.on("message", async (message) => {
             message.channel.send(
                 new MessageEmbed()
                     .setTitle("Reddit error!")
-                    .setDescription("There was a problem: *" + redditItem.message + "*\n\nI am very sorry.")
+                    .setDescription("There was a problem: *" + redditItem.message + "*, I am very sorry.")
                     .setColor("#ff0000")
                     .setThumbnail(redditIcon)
             );
@@ -450,7 +473,7 @@ bot.on("message", async (message) => {
             message.channel.send(
                 new MessageEmbed()
                     .setTitle("Reddit error!")
-                    .setDescription("No subreddit items were returned, or the given subreddit does not exist.\nWe are very sorry.")
+                    .setDescription("No posts are available, I am very sorry.")
                     .setColor("#ff0000")
                     .setThumbnail(redditIcon)
             );
