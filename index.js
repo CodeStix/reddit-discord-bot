@@ -34,11 +34,10 @@ let defaultSubredditMethod = "top"; // hot | rising | top | new
 
 const videosPath = path.join(__dirname, "cache", "video");
 
+// Streamable account: stijnvantvijfde@gmail.com 3vGrFAKTrvQg8UHh
+
 redisClient.once("ready", async () => {
     console.log("[Redis] Connected");
-
-    const res = await getAsync("test");
-    console.log(res);
 });
 redisClient.on("error", (err) => {
     console.error("[Redis/Error]", err);
@@ -47,18 +46,17 @@ redisClient.on("warning", (warn) => {
     console.warn("[Redis/Warning]", warn);
 });
 
+bot.login(token);
+bot.on("ready", () => {
+    console.log("[DiscordBotConnect] Connected");
+});
+bot.on("error", (err) => {
+    console.error("[DiscordBot/Error] Caught error:", err);
+});
+
 function decodeHtmlEscaping(str) {
     return str.replace("&amp;", "&").replace("&quot;", '"').replace("&lt;", "<").replace("&gt;", ">");
 }
-
-// Streamable account: stijnvantvijfde@gmail.com 3vGrFAKTrvQg8UHh
-
-console.log("Connecting to discord...");
-
-bot.login(token);
-bot.on("ready", () => {
-    console.log("Connected.");
-});
 
 // https://www.reddit.com/user/timawesomeness/comments/813jpq/default_reddit_profile_pictures/
 function getRandomDefaultAvatarUrl() {
@@ -105,64 +103,64 @@ async function getAuthorAvatarUrl(authorName) {
  */
 async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) {
     url = encodeURI(url);
-    console.log(url);
     /*var currentStatusAwaiter = channel.send("Loading...").catch((err) => {
         console.warn("Warning: could not set status:", err);
-    });*/
-
+    });
     function setStatus(status) {
-        // currentStatusAwaiter.then((m) => (status ? m.edit(status) : m.delete()));
-    }
+        currentStatusAwaiter.then((m) => (status ? m.edit(status) : m.delete()));
+    }*/
 
     /**
      * @param {string} url
-     * @param {'url' | 'pngImage' | 'video'} type
+     * @param {'url' | 'image' | 'video'} type
      */
-    function sendAs(url, type) {
+    async function sendAs(url, type, message) {
         switch (type) {
             case "url":
-                if (markSpoiler) channel.send("||" + url + "||", { spoiler: true });
-                else channel.send(url);
+                if (markSpoiler) await channel.send(message + "||" + url + "||", { spoiler: true });
+                else await channel.send(message + url);
                 break;
-            case "pngImage":
-                if (markSpoiler) channel.send(new MessageAttachment(url, "SPOILER_.gif"));
-                else channel.send(new MessageAttachment(url, "image.gif"));
+            case "image":
+                if (markSpoiler) await channel.send(message, new MessageAttachment(url, "SPOILER_.png"));
+                else await channel.send(message, new MessageAttachment(url, "image.gif"));
                 break;
             case "video":
-                if (markSpoiler) channel.send(new MessageAttachment(url, "SPOILER_.mp4"));
-                else channel.send(new MessageAttachment(url, "video.mp4"));
+                if (markSpoiler) await channel.send(message, new MessageAttachment(url, "SPOILER_.mp4"));
+                else await channel.send(message, new MessageAttachment(url, "video.mp4"));
                 break;
             default:
                 console.warn("Warning: Invalid sendAsSpoiler type", type);
                 return;
         }
+
+        console.log(url);
     }
 
     if (url.startsWith("https://5050") || url.startsWith("http://5050") || url.startsWith("http://bit.ly") || url.startsWith("https://bit.ly")) {
         try {
             url = (await axios.head(url, { maxRedirects: 5 })).request.res.responseUrl;
         } catch (ex) {
-            console.log("Warning: Could not get redirected url", ex.message);
+            console.log("[5050Convert/Warning] Could not get redirected url", ex.message);
         }
     }
 
     if (url.startsWith("https://imgur.com/")) {
         url = "https://i.imgur.com/" + url.substring("https://imgur.com/".length);
-        console.log("Info: Extracted imgur url");
+        console.log("[ImgurExtract] Extracted imgur url");
     } else if (url.startsWith("https://postimg.cc/")) {
         try {
             const response = await axios.get(url);
             const ch = cheerio.load(response.data);
             url = ch("head meta[property='og:image']").attr("content");
-            console.log("Info: Extracted postimg.cc url", url);
+            console.log("[PostImgExtract] Extracted postimg.cc url", url);
         } catch (ex) {
-            console.log("Warning: could not extract postimg.cc image", ex.message);
+            console.warn("[PostImgExtract/Warning] Could not extract postimg.cc image", ex.message);
         }
     }
 
     if (!tryConvertVideo) {
         if (
-            //url.endsWith(".gif") ||
+            url.endsWith(".gif") ||
             url.endsWith(".gifv") ||
             url.endsWith(".mp4") ||
             url.startsWith("https://v.redd.it/") ||
@@ -182,14 +180,13 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
 
         try {
             if (await existsAsync(videoFile)) {
-                sendAs(videoFile, "video");
+                await sendAs(videoFile, "video");
                 //console.log("probe", JSON.parse((await exec(`ffprobe -i "${videoFile}" -v quiet -print_format json -show_format -hide_banner`)).stdout));
             } else {
-                setStatus("🎥 Converting video for the first time ...");
                 const tempVideoFile = videoFile + ".temp.mp4";
                 // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
                 const { stdout, stderr } = await execAsync(
-                    `youtube-dl.exe -f "best[filesize<8M]/(bestvideo[width<=800]+bestaudio)[filesize<8M]/worstvideo[width>=480]+bestaudio/best" --no-playlist --retries 3 --output "${tempVideoFile}" "${url}"`, // --max-filesize ${youtubeDlMaxFileSize}  --exec "move {} \"${tempVideoFile}\"" --cache-dir "${youtubeDlCachePath}"
+                    `youtube-dl.exe -f "best[filesize<8M]/(bestvideo[width<=800]+bestaudio)[filesize<8M]/worstvideo[width>=300]+bestaudio/best/bestvideo+bestaudio" --no-playlist --retries 3 --output "${tempVideoFile}" "${url}"`, // --max-filesize ${youtubeDlMaxFileSize}  --exec "move {} \"${tempVideoFile}\"" --cache-dir "${youtubeDlCachePath}"
                     execOptions
                 );
 
@@ -202,8 +199,6 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
 
                     // reencode if too large or if mpegts file (discord does not display these)
                     if (videoFileInfo.size > targetByteCount || videoInfo.format.format_name.includes("mpegts")) {
-                        setStatus("🗜️ Making the video a little smaller ...");
-
                         // video is too big, needs to be compressed
                         // https://unix.stackexchange.com/questions/28803/how-can-i-reduce-a-videos-size-with-ffmpeg
                         // https://stackoverflow.com/questions/6239350/how-to-extract-duration-time-from-ffmpeg-output
@@ -219,26 +214,20 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
                     }
 
                     if (await existsAsync(videoFile)) {
-                        sendAs(videoFile, "video");
+                        await sendAs(videoFile, "video");
                     } else {
-                        console.log("Warning: Could not [compress] video", stdout, stderr);
-                        setStatus("⚠️ **Error while compressing video, take a url:**");
-                        sendAs(url, "url");
-                        return;
+                        console.warn("[YoutubeDL/Warning] Converted video does not exist, assuming fail:", stdout, stderr);
+                        await sendAs(url, "url", "⚠️ **Error while compressing video, take a url:** ");
                     }
                 } else {
-                    console.log("Warning: Could not [download] video", stdout, stderr);
+                    console.error("[YoutubeDL/Error] Could not download video:", stdout, stderr);
                     execAsync(`youtube-dl.exe -F "${url}"`, execOptions).then((e) => console.log("Info: Available video formats:", e.stdout, e.stderr));
-                    setStatus("⚠️ **Error while converting video, take a url:**");
-                    sendAs(url, "url");
-                    return;
+                    await sendAs(url, "url", "⚠️ **Error while converting video, take a url:** ");
                 }
             }
         } catch (ex) {
-            console.log("Warning: Could not [upload] video: ", ex.message);
-            setStatus("⚠️ **Error while uploading video, take a url:**");
-            sendAs(url, "url");
-            return;
+            console.warn("[TryConvertVideo/Error] Could not upload/convert video: ", ex.message);
+            await sendAs(url, "url", "⚠️ **Error while uploading video, take a url:** ");
         }
     } else if (
         url.startsWith("https://www.youtube.com/") ||
@@ -247,39 +236,38 @@ async function sendRedditAttachment(channel, url, tryConvertVideo, markSpoiler) 
         url.startsWith("https://m.youtube.com/") ||
         url.startsWith("https://youtu.be/")
     ) {
-        sendAs(url, "url");
+        await sendAs(url, "url");
     } else if (
+        //url.endsWith(".gif") ||
+        url.endsWith(".png") ||
+        url.endsWith(".jpg") ||
         url.startsWith("https://i.redd.it/") ||
-        url.startsWith("https://i.postimg.cc/") ||
-        url.endsWith(".gif") ||
-        /*url.startsWith("https://i.imgur.com/") && */ url.endsWith(".png") ||
-        url.endsWith(".jpg") /*|| url.startsWith("https://gfycat.com/")*/
+        url.startsWith("https://i.postimg.cc/")
     ) {
         try {
-            sendAs(url, "pngImage");
+            await sendAs(url, "image");
         } catch (ex) {
-            console.log("Warning: could not send image:", ex.message);
-            setStatus("⚠️ **Error while uploading image, take a url:**");
-            sendAs(url, "url");
-            return;
+            console.log("[SendImage/Warning] Could not send image:", ex.message);
+            await sendAs(url, "url", "⚠️ **Error while uploading image, take a url:** ");
         }
     } else {
-        sendAs(url, "url");
+        await sendAs(url, "url");
     }
-
-    setStatus("");
 }
 
-const cachePerPages = 35; // max is 100
-const redditResponseDataCache = {};
+const cachePerPages = 35; // the amount of reddit items to cache in one page
+const cacheResponseTtl = 60 * 60 * 30; // remember the reddit server response for x seconds
+const cacheIndexTtl = 60 * 60 * 30; // remember the channel's reddit feed index for x seconds
+const cachePreviousSubredditTtl = 30 * 60; // remember the previous subreddit for x seconds
 
 async function getCachedRedditItem(subredditName, index, method = "hot") {
     // currently no cache is active
     const page = Math.floor(index / cachePerPages);
     try {
         const key = `reddit_${subredditName}_${method}_${page}`;
-        if (key in redditResponseDataCache) {
-            var data = redditResponseDataCache[key];
+        var data = await getAsync(key);
+        if (data) {
+            data = JSON.parse(data);
             if (index % cachePerPages < data.children.length) return data.children[index % cachePerPages].data;
             else return null;
         } else {
@@ -288,8 +276,9 @@ async function getCachedRedditItem(subredditName, index, method = "hot") {
                 after = null;
             } else {
                 const previousPageKey = `reddit_${subredditName}_${method}_${page - 1}`;
-                if (previousPageKey in redditResponseDataCache) {
-                    after = redditResponseDataCache[previousPageKey].after;
+                var afterData = await getAsync(previousPageKey);
+                if (afterData) {
+                    after = JSON.parse(afterData).after;
                     console.log("Info: next page, after =", after);
                 } else {
                     after = null;
@@ -303,7 +292,7 @@ async function getCachedRedditItem(subredditName, index, method = "hot") {
             var data = Array.isArray(response.data) ? response.data[0].data : response.data.data;
             if (Array.isArray(response.data)) console.log("Info: received array based response object from reddit");
             if (data.children.length <= 0) return null;
-            redditResponseDataCache[key] = data;
+            setexAsync(key, cacheResponseTtl, JSON.stringify(data));
             console.log("Info: reddit response stored in cache under key:", key, data.children.length, "items");
             return data.children[index % cachePerPages].data;
         }
@@ -402,11 +391,8 @@ bot.on("message", async (message) => {
     return;
     }*/
 
-    var data = channelData[message.channel.id];
-    if (!data) {
-        data = {};
-        channelData[message.channel.id] = data;
-    }
+    const previousSubredditKey = `channel_${message.channel.id}_user_${message.author.id}_previous`;
+    const previousSubreddit = await getAsync(previousSubredditKey);
 
     const input = message.content
         .trim()
@@ -421,33 +407,20 @@ bot.on("message", async (message) => {
     if (input == "r/" && topic.startsWith("r/")) {
         subredditName = topic;
     } else if (input == "r//") {
-        subredditName = data.previousSubreddit;
+        subredditName = previousSubreddit;
         if (!subredditName) return;
-    } else if (input == "r//data") {
-        message.channel.send("`" + util.inspect(channelData, true, 4) + "`");
-        return;
-    } else if (input == "r//cache") {
-        message.channel.send("`" + util.inspect(redditResponseDataCache) + "`");
-        return;
     } else {
         subredditName = input;
     }
-    data.previousSubreddit = subredditName;
 
-    if (!data.subreddits) data.subreddits = {};
-    var subredditData = data.subreddits[subredditName];
-    if (!subredditData) {
-        subredditData = {};
-        data.subreddits[subredditName] = subredditData;
-    }
-
-    if (subredditData.index === undefined) subredditData.index = 0;
+    const indexKey = `channel_${message.channel.id}_reddit_${subredditName}_${defaultSubredditMethod}_index`;
+    var index = (await getAsync(indexKey)) || 0;
 
     var tries = 0,
         nullTries = 0;
     var redditItem = null;
     do {
-        redditItem = await getCachedRedditItem(subredditName, subredditData.index++, defaultSubredditMethod);
+        redditItem = await getCachedRedditItem(subredditName, index++, defaultSubredditMethod);
         tries++;
 
         if (redditItem instanceof Error) {
@@ -464,7 +437,7 @@ bot.on("message", async (message) => {
         if (redditItem === null) {
             if (++nullTries >= 5) {
                 console.log("Warning: resetting subreddit index");
-                subredditData.index = 0;
+                index = 0;
                 nullTries = 0;
             }
         }
@@ -485,6 +458,8 @@ bot.on("message", async (message) => {
         (redditItem.selftext || "").length > skipAtDescriptionLength ||
         minimumVotes > Math.abs(redditItem.score)
     );
+
+    redisClient.multi().setex(indexKey, cacheIndexTtl, index).setex(previousSubredditKey, cachePreviousSubredditTtl, subredditName).exec();
 
     sendRedditItem(message.channel, subredditName, redditItem);
 });
