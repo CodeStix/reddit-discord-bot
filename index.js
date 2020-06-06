@@ -550,7 +550,7 @@ discordBot.on("message", async (message) =>
         redditItem = await getCachedRedditItem(subredditName, index++, subredditMode, subredditTopTimespan, useCache);
 
         // Cache future video post
-        getCachedRedditItem(subredditName, index + 4, subredditMode, subredditTopTimespan, useCache).then(async (futureRedditItem) =>
+        getCachedRedditItem(subredditName, index + cacheFutureVideoIn, subredditMode, subredditTopTimespan, useCache).then(async (futureRedditItem) =>
         {
             if (!futureRedditItem || futureRedditItem instanceof Error) return;
             futureRedditItem.url = await unpackUrl(futureRedditItem.url);
