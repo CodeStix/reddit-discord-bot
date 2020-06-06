@@ -10,21 +10,6 @@ const cheerio = require("cheerio");
 const redis = require("redis");
 const redditCache = require("./cachedReddit");
 
-const discordBot = new DiscordClient();
-
-var redisClient = new redis.RedisClient({
-    port: process.env.REDIS_PORT,
-    host: process.env.REDIS_HOST,
-    password: process.env.REDIS_PASSWORD,
-    no_ready_check: true,
-    enable_offline_queue: false,
-})
-
-const token = "NzExNTI0NDA1MTYzMDY1Mzg1.XsEQ-w.ulbbTU95eEMpvP5sqXJqEMGnebI";
-
-const rkeysAsync = util.promisify(redisClient.keys).bind(redisClient);
-const rgetAsync = util.promisify(redisClient.get).bind(redisClient);
-const rsetexAsync = util.promisify(redisClient.setex).bind(redisClient);
 const existsAsync = util.promisify(fs.exists);
 const statAsync = util.promisify(fs.stat);
 const renameAsync = util.promisify(fs.rename);
@@ -51,6 +36,24 @@ const maxVideoDownloadSize = 1000 * 1000 * 100;
 const cachePerPages = 30; // The amount of reddit items to cache in one page
 const cachePreviousUserSubredditTtl = 60 * 30; // Remember the user's previous subreddit for x seconds
 
+const discordBot = new DiscordClient();
+discordBot.login(process.env.DISCORD_TOKEN);
+discordBot.on("ready", () =>
+{
+    console.log("[DiscordBotConnect] Connected");
+});
+discordBot.on("error", (err) =>
+{
+    console.error("[DiscordBot/Error] Caught error:", err);
+});
+
+var redisClient = new redis.RedisClient({
+    port: process.env.REDIS_PORT,
+    host: process.env.REDIS_HOST,
+    password: process.env.REDIS_PASSWORD,
+    no_ready_check: true,
+    enable_offline_queue: false,
+})
 redisClient.once("ready", async () =>
 {
     console.log("[Redis] Connected");
@@ -63,16 +66,9 @@ redisClient.on("warning", (warn) =>
 {
     console.warn("[Redis/Warning]", warn);
 });
-
-discordBot.login(token);
-discordBot.on("ready", () =>
-{
-    console.log("[DiscordBotConnect] Connected");
-});
-discordBot.on("error", (err) =>
-{
-    console.error("[DiscordBot/Error] Caught error:", err);
-});
+const rkeysAsync = util.promisify(redisClient.keys).bind(redisClient);
+const rgetAsync = util.promisify(redisClient.get).bind(redisClient);
+const rsetexAsync = util.promisify(redisClient.setex).bind(redisClient);
 
 /**
  * Convert a redirecting, 50/50, bit.ly, imgur... url to the direct url.
