@@ -6,3 +6,6 @@ youtube-dl.exe
 cache/
 certs/
 bin/
+redis.conf
+db/
+.env
