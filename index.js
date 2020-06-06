@@ -2,25 +2,15 @@ require("dotenv").config();
 const { Client: DiscordClient, MessageAttachment, MessageEmbed, Message, TextChannel } = require("discord.js");
 const ax = require("./axiosInstance");
 const util = require("util");
-const path = require("path");
-const http = require("http");
 const fs = require("fs");
-const crypto = require("crypto");
 const cheerio = require("cheerio");
 const redis = require("redis");
-const redditCache = require("./cachedReddit");
-
-const existsAsync = util.promisify(fs.exists);
-const statAsync = util.promisify(fs.stat);
-const renameAsync = util.promisify(fs.rename);
-const execAsync = util.promisify(require("child_process").exec);
-const execOptions = {
-    cwd: __dirname,
-};
+const redditCache = require("./reddit");
+const video = require("./video");
 
 const redditIcon = "https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-72x72.png";
 
-let cacheVideos = true;
+let downloadVideos = true;
 let enableTopComments = true;
 let skipAtDescriptionLength = 400;
 let truncateAtDescriptionLength = 375; // Max is 1024
@@ -32,19 +22,17 @@ let minimumPostVotes = 0;
 let commentSortMode = "top"; // Can be: confidence, top, new, controversial, old, random, qa, live
 
 const cacheFutureVideoIn = 4; // Cache x videos into the future
-const maxVideoDownloadSize = 1000 * 1000 * 100;
-const cachePerPages = 30; // The amount of reddit items to cache in one page
 const cachePreviousUserSubredditTtl = 60 * 30; // Remember the user's previous subreddit for x seconds
 
 const discordBot = new DiscordClient();
 discordBot.login(process.env.DISCORD_TOKEN);
 discordBot.on("ready", () =>
 {
-    console.log("[DiscordBotConnect] Connected");
+    console.log("[discord] Connected");
 });
 discordBot.on("error", (err) =>
 {
-    console.error("[DiscordBot/Error] Caught error:", err);
+    console.error("[discord] Error:", err);
 });
 
 var redisClient = new redis.RedisClient({
@@ -56,15 +44,15 @@ var redisClient = new redis.RedisClient({
 })
 redisClient.once("ready", async () =>
 {
-    console.log("[Redis] Connected");
+    console.log("[redis] Connected");
 });
 redisClient.on("error", (err) =>
 {
-    console.error("[Redis/Error]", err);
+    console.error("[redis] Error:", err);
 });
 redisClient.on("warning", (warn) =>
 {
-    console.warn("[Redis/Warning]", warn);
+    console.warn("[redis] Warning:", warn);
 });
 const rkeysAsync = util.promisify(redisClient.keys).bind(redisClient);
 const rgetAsync = util.promisify(redisClient.get).bind(redisClient);
@@ -83,82 +71,46 @@ async function unpackUrl(url)
             url = (await ax.head(url, { maxRedirects: 5 })).request.res.responseUrl;
         } catch (ex)
         {
-            console.log("[5050Convert/Warning] Could not get redirected url", ex.message);
+            console.log("[unpackUrl] Warning: Could not get redirected url", ex.message);
         }
     }
 
-    if (url.startsWith("https://imgur.com/"))
+    if (url.startsWith("https://imgur.com/gallery/")) 
     {
-        url = "https://i.imgur.com/" + url.substring("https://imgur.com/".length);
-        console.log("[ImgurExtract] Extracted imgur url");
-    } else if (url.startsWith("https://postimg.cc/"))
+        url = "https://imgur.com/a/" + url.substring("https://imgur.com/gallery/".length);
+    }
+
+    else if (url.startsWith("https://postimg.cc/") || url.startsWith("https://imgur.com/"))
     {
         try
         {
-            const response = await ax.get(url);
+            // <meta property="og:video" content="https://i.imgur.com/Xob3epw.mp4"/>
+            // <meta property="og:image" content="https://i.imgur.com/I42mS3H.jpg?fb" />
+            const response = await ax.get(url, { responseType: "text", transformResponse: ax.defaults.transformResponse });
             const ch = cheerio.load(response.data);
-            url = ch("head meta[property='og:image']").attr("content");
-            console.log("[PostImgExtract] Extracted postimg.cc url", url);
-        } catch (ex)
+
+            var elem = ch("head meta[property='og:video']");
+            if (elem) 
+            {
+                // Is video
+                url = elem.attr("content");
+            }
+            else 
+            {
+                elem = ch("head meta[property='og:image']");
+
+                if (elem)
+                    url = elem.attr("content");
+            }
+
+            console.log("[unpackUrl] Extracted imgur/postimg url", url);
+        }
+        catch (ex)
         {
-            console.warn("[PostImgExtract/Warning] Could not extract postimg.cc image", ex.message);
+            console.warn("[unpackUrl] Warning: Could not extract imgur/postimg image", ex);
         }
     }
     return url;
-}
-
-function getPathForVideo(videoUrl, maxVideoSize)
-{
-    const videoUrlHash = crypto.createHash("sha1").update(videoUrl, "binary").digest("hex");
-    return __dirname + "/cache/videos/" + videoUrlHash + "-" + maxVideoSize + ".mp4";
-}
-
-async function getCachedVideo(url, maxVideoSize = 1000 * 1000 * 8)
-{
-    try
-    {
-        const videoFile = getPathForVideo(url, maxVideoSize);
-        console.log("exists?", videoFile);
-        if (await existsAsync(videoFile)) return videoFile;
-        console.log("ye");
-
-        if (!cacheVideos) return null;
-
-        // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
-        const tempVideoFile = videoFile + ".temp.mp4";
-        await execAsync(
-            `youtube-dl -f "[filesize>6M][filesize<=8M]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/bestvideo+bestaudio/best/worst" --max-filesize ${maxVideoDownloadSize} --no-playlist --retries 3 --output "${tempVideoFile}" "${url}"`, // --no-warnings --print-json --no-progress
-            execOptions
-        );
-
-        // Will error is file not exists
-        const videoInfo = JSON.parse(
-            (await execAsync(`ffprobe -i "${tempVideoFile}" -v quiet -print_format json -show_format -hide_banner`, execOptions)).stdout
-        );
-
-        // Reencode if too large or if mpegts file (discord does not display these)
-        // https://unix.stackexchange.com/questions/28803/how-can-i-reduce-a-videos-size-with-ffmpeg
-        // https://stackoverflow.com/questions/6239350/how-to-extract-duration-time-from-ffmpeg-output
-        if (videoInfo.format.size > maxVideoSize || videoInfo.format.format_name.includes("mpegts") || videoInfo.format.format_name.includes("gif"))
-        {
-            //console.log("[ensureCachedVideo] Info: Reencoding/compressing with ffmpeg");
-            var targetBitrate = (maxVideoSize * 8) / (videoInfo.format.duration * 1.5); //videoInfo.format.bit_rate * (maxVideoSize / videoInfo.format.size) * 0.75;
-            await execAsync(
-                `ffmpeg -ss ${videoInfo.format.start_time} -i "${tempVideoFile}" -b:v ${targetBitrate} "${videoFile}"`, // -r 20 -vf scale=720:-2
-                execOptions
-            );
-            fs.unlink(tempVideoFile, () => { });
-        } else
-        {
-            await renameAsync(tempVideoFile, videoFile);
-        }
-
-        return videoFile;
-    } catch (ex)
-    {
-        console.warn("[ensureCachedVideo] Error: Could not upload/convert video: ", ex.message);
-        return null;
-    }
 }
 
 /**
@@ -191,13 +143,11 @@ async function sendRedditAttachment(channel, url, isVideo, markSpoiler)
                 console.warn("Warning: Invalid sendAsSpoiler type", type);
                 return;
         }
-
-        console.log(url);
     }
 
-    if (cacheVideos && isVideo)
+    if (downloadVideos && isVideo)
     {
-        const videoFile = await getCachedVideo(url);
+        const videoFile = await video.getCachedVideo(url);
         if (videoFile)
         {
             await sendAs(videoFile, "video");
@@ -237,7 +187,7 @@ async function sendRedditAttachment(channel, url, isVideo, markSpoiler)
  * @param {'hour' | 'day' | 'week' | 'month' | 'year' | 'all'} timespan
  * @param {boolean} useCache
  */
-async function getCachedRedditItem(subredditName, index, mode, timespan, useCache = true)
+/*async function getCachedRedditItem(subredditName, index, mode, timespan, useCache = true)
 {
     subredditName = subredditName.toLowerCase();
     const baseKey = `r${subredditName}:${mode === "top" ? mode + ":" + timespan : mode}`;
@@ -256,14 +206,12 @@ async function getCachedRedditItem(subredditName, index, mode, timespan, useCach
             after = await rgetAsync(`${baseKey}:p${page - 1}:after`);
             if (!after)
             {
-                console.warn("[GetRedditItem/Warning] Could not get 'after', probably end of feed");
+                console.warn("[getCachedRedditItem] Warning: Could not get 'after', probably end of feed");
                 return null;
             }
         }
 
-        var response = await ax.get(`https://api.reddit.com/r/${subredditName}/${mode}?limit=${cachePerPages}&after=${after}&t=${timespan}`, {
-            responseType: "json",
-        });
+        var response = await ax.get(`https://api.reddit.com/r/${subredditName}/${mode}?limit=${cachePerPages}&after=${after}&t=${timespan}`);
         var data = Array.isArray(response.data) ? response.data[0].data : response.data.data;
         if (data.children.length <= 0 || !data.children[0].data.subreddit) throw new Error("No items returned.");
 
@@ -273,10 +221,10 @@ async function getCachedRedditItem(subredditName, index, mode, timespan, useCach
     }
     catch (ex)
     {
-        console.warn("Error: could not get subreddit items:", ex);
+        console.warn("[getCachedRedditItem] Error: could not get subreddit items:", ex.message);
         return ex;
     }
-}
+}*/
 
 async function getTopComment(redditItem)
 {
@@ -287,7 +235,7 @@ async function getTopComment(redditItem)
         });
 
         fs.writeFile("./badrequests/latestcomment.json", JSON.stringify(response.data), () => { });
-        if (response.data.length < 2 || response.data[1].data.children.length < 1) return;
+        if (!response.data || response.data.length < 2 || response.data[1].data.children.length < 1) return;
 
         const comments = response.data[1].data.children;
         var topComment = comments.find((val) => !val.data.score_hidden);
@@ -406,14 +354,13 @@ async function sendRedditItem(channel, redditItem)
         message.edit(messageEmbed);
     });
 
-    console.log(fullLink, redditItem.url);
-
     if (fullLink != redditItem.url)
     {
         redditItem.url = await unpackUrl(redditItem.url);
 
         sendRedditAttachment(channel, redditItem.url, redditItem.is_video || isVideoUrl(redditItem.url), asSpoiler);
-    } else
+    }
+    else
     {
         console.log("[sendRedditItem] Info: Stale reddit post, not sending attachment", fullLink);
     }
@@ -473,6 +420,47 @@ discordBot.on("messageUpdate", (message) =>
     console.log("message was updated:", message.content);
 });
 
+function redditItemMatchesFilters(redditItem) 
+{
+    return (!tryRemoveNsfw || !redditItem.title.toLowerCase().includes("nsf")) &&
+        skipAtDescriptionLength > (redditItem.selftext || "").length &&
+        minimumPostVotes <= Math.abs(redditItem.score);
+}
+
+
+async function nextRedditItem(index, subredditName, subredditMode, subredditTopTimespan) 
+{
+    var tries = 0;
+    var redditItem = null;
+    do
+    {
+        redditItem = await redditCache.getCachedRedditItem(subredditName, index, subredditMode, subredditTopTimespan, index !== 0);
+
+        if (!redditItem)
+            return [null, 0];
+
+        // Cache future video post
+        redditCache.getCachedRedditItem(subredditName, index + cacheFutureVideoIn, subredditMode, subredditTopTimespan, index !== 0).then(async (futureRedditItem) =>
+        {
+            if (!futureRedditItem || futureRedditItem instanceof Error || !redditItemMatchesFilters(futureRedditItem)) return;
+            futureRedditItem.url = await unpackUrl(futureRedditItem.url);
+            if (futureRedditItem.is_video || isVideoUrl(futureRedditItem.url))
+            {
+                const cachedVideoPath = await video.getCachedVideo(futureRedditItem.url); // Will cache video
+                if (cachedVideoPath) console.log("[sendInChannel] Cached future video", futureRedditItem.url, "->", cachedVideoPath);
+            }
+        });
+
+        if (++tries > 50)
+            throw new Error("There are no posts that match your filters.");
+
+        index++;
+
+    } while (!redditItemMatchesFilters(redditItem));
+
+    return [redditItem, index];
+}
+
 discordBot.on("message", async (message) =>
 {
     if (message.author.bot) return;
@@ -520,10 +508,12 @@ discordBot.on("message", async (message) =>
     if (userInput && userInput[1])
     {
         subredditName = userInput[1];
-    } else if (channelTopicInput && channelTopicInput[1])
+    }
+    else if (channelTopicInput && channelTopicInput[1])
     {
         subredditName = channelTopicInput[1];
-    } else
+    }
+    else
     {
         message.reply("No subreddit specified by user and channel.");
         return;
@@ -536,77 +526,45 @@ discordBot.on("message", async (message) =>
     }
 
     const indexKey = `r${subredditName}:${subredditMode === "top" ? subredditMode + ":" + subredditTopTimespan : subredditMode}:ch${message.channel.id}:idx`;
-    var index = (await rgetAsync(indexKey)) || 0;
+    var index = parseInt(await rgetAsync(indexKey)) || 0;
 
-    var tries = 0;
-    var redditItem = null;
-    do
+    var redditItem;
+    try
     {
-        const useCache = index !== 0;
-        redditItem = await getCachedRedditItem(subredditName, index++, subredditMode, subredditTopTimespan, useCache);
-
-        // Cache future video post
-        getCachedRedditItem(subredditName, index + cacheFutureVideoIn, subredditMode, subredditTopTimespan, useCache).then(async (futureRedditItem) =>
-        {
-            if (!futureRedditItem || futureRedditItem instanceof Error) return;
-            futureRedditItem.url = await unpackUrl(futureRedditItem.url);
-            if (futureRedditItem.is_video || isVideoUrl(futureRedditItem.url))
-            {
-                const cachedVideoPath = await getCachedVideo(futureRedditItem.url); // will cache video
-                if (cachedVideoPath) console.log("[sendInChannel] Cached future video", futureRedditItem.url, "->", cachedVideoPath);
-            }
-        });
-
-        tries++;
-
-        if (redditItem instanceof Error)
-        {
-            message.channel.send(
-                new MessageEmbed()
-                    .setTitle("❌ Reddit error!")
-                    .setDescription(`There was a problem getting a post from r/${subredditName}/${subredditMode}: *${redditItem.message}*, I am very sorry.`)
-                    .setColor("#ff0000")
-                    .setThumbnail(redditIcon)
-            );
-            return;
-        }
-
-        if (!redditItem)
-        {
-            message.channel.send(
-                new MessageEmbed()
-                    .setTitle("⚠️ End of feed!")
-                    .setDescription(
-                        `The end of **r/${subredditName}/${subredditMode}** has been reached, if you request more posts from this subreddit (and filter, ${subredditMode}), you will notice that some will get reposted. Come back later for more recent posts.`
-                    )
-                    .setColor("#ffff00")
-            );
-            index = 0;
-            return;
-        }
-
-        if (tries > cachePerPages)
-        {
-            message.channel.send(
-                new MessageEmbed()
-                    .setTitle("❌ Reddit error!")
-                    .setDescription("No posts match your filter (and globally enabled filters), I am very sorry.")
-                    .setColor("#ff0000")
-                    .setThumbnail(redditIcon)
-            );
-            return;
-        }
-    } while (
-        (tryRemoveNsfw && redditItem.title.toLowerCase().includes("nsf")) ||
-        (redditItem.selftext || "").length > skipAtDescriptionLength ||
-        minimumPostVotes > Math.abs(redditItem.score)
-    );
+        [redditItem, index] = await nextRedditItem(index, subredditName, subredditMode, subredditTopTimespan);
+    }
+    catch (ex) 
+    {
+        console.error("[sendInChannel] Error: getMatchingRedditItem() threw error:", ex);
+        message.channel.send(
+            new MessageEmbed()
+                .setTitle("❌ Reddit error!")
+                .setDescription(`There was a problem getting a post from r/${subredditName}/${subredditMode}: *${ex.message}*, I am very sorry.`)
+                .setColor("#ff0000")
+                .setThumbnail(redditIcon)
+        );
+        return;
+    }
 
     const indexTtl = redditCache.getTtlForRedditIndex(subredditMode, subredditTopTimespan);
     var chain = redisClient.multi();
     if (indexTtl >= 0) chain = chain.setex(indexKey, indexTtl, index);
     else chain = chain.set(indexKey, index);
     chain.setex(`ch${message.channel.id}:u${message.author.id}:prev`, cachePreviousUserSubredditTtl, input).exec();
+
+    if (index === 0 && redditItem == null) 
+    {
+        message.channel.send(
+            new MessageEmbed()
+                .setTitle("⚠️ Begin of feed!")
+                .setDescription(
+                    `This is the start of the **r/${subredditName}/${subredditMode}** subreddit, if you request more posts from this subreddit (and filter, ${subredditMode}), you will notice that some will get reposted. Come back later for more recent posts.`
+                )
+                .setColor("#ffff00")
+        );
+
+        return;
+    }
 
     sendRedditItem(message.channel, redditItem);
 });
