@@ -106,7 +106,8 @@ module.exports.getSubredditIcon = async function (subredditName, fast = false)
             try
             {
                 response = await ax.get(`https://api.reddit.com/r/${subredditName}/about`);
-            } catch (ex)
+            }
+            catch (ex)
             {
                 console.warn("[CachedReddit/Error] Could not get subreddit icon:", ex.message);
                 return "";
@@ -153,6 +154,22 @@ module.exports.getRandomDefaultUserIcon = function ()
     return `https://www.redditstatic.com/avatars/avatar_default_${randomTextureId}_${randomColor}.png`;
 };
 
+module.exports.getRedditPost = async function (subredditName, postId) 
+{
+    var url;
+    if (subredditName) 
+    {
+        subredditName = subredditName.toLowerCase();
+        url = `https://api.reddit.com/r/${subredditName}/comments/${postId}`;
+    }
+    else
+    {
+        url = `https://api.reddit.com/comments/${postId}`;
+    }
+    const response = await ax.get(url);
+    var data = Array.isArray(response.data) ? response.data[0].data : response.data.data;
+    return data.children[0].data;
+}
 
 /**
  * @param {string} subredditName
@@ -195,7 +212,7 @@ module.exports.getCachedRedditItem = async function (subredditName, index, mode,
 
         module.exports.cacheResponse(subredditName, data, mode, timespan, page);
 
-        fs.writeFileSync("./cache/test.json", JSON.stringify(data, null, 2));
+        //fs.writeFileSync("./cache/lastresponse.json", JSON.stringify(data, null, 2));
 
         if (data && clampedIndex < data.children.length)
         {

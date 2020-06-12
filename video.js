@@ -13,6 +13,7 @@ module.exports.execOptions = {
 
 module.exports.disableVideoDownload = false;
 module.exports.maxVideoDownloadSize = 100 * 1024 * 1024;
+module.exports.maxVideoCompressLength = 100;
 
 module.exports.compressVideo = async function (inputPath, outputPath, targetBitrate, targetFramerate = 24, targetAudioBitrate = 35000) 
 {
@@ -83,16 +84,22 @@ module.exports.getCachedVideoTask = async function (videoUrl, maxVideoFileSize =
         // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
         const tempVideoFile = videoFile + ".temp.mp4";
         await execAsync(
-            `youtube-dl -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/bestvideo+bestaudio/best" --max-filesize ${module.exports.maxVideoDownloadSize} --no-playlist --retries 3 --output "${tempVideoFile}" "${videoUrl}"`, // --no-warnings --print-json --no-progress
+            `youtube-dl -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${module.exports.maxVideoDownloadSize} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFile}" "${videoUrl}"`, // --no-warnings --print-json --no-progress
             module.exports.execOptions
         );
 
         // Will error is file not exists
         const videoInfo = await module.exports.getVideoInfo(tempVideoFile);
 
+        if (!videoInfo.format.duration || videoInfo.format.duration > module.exports.maxVideoCompressLength)
+            throw new Error("Invalid duration: " + videoInfo.format.duration);
+
         // Reencode if too large or if mpegts file (discord does not display these)
         if (videoInfo.format.size > maxVideoFileSize || videoInfo.format.format_name.includes("mpegts") || videoInfo.format.format_name.includes("gif"))
         {
+            //var test = null ?? null;
+
+            console.log("[getCachedVideoTask] Compressing, video format:", videoInfo.format);
             const targetAudioBitrate = 35000;
             const targetFramerate = 24;
             const targetBitrate = (maxVideoFileSize * 8) / (videoInfo.format.duration * 1.4) - targetAudioBitrate;
