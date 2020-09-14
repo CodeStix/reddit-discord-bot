@@ -5,77 +5,86 @@ const crypto = require("crypto");
 const existsAsync = util.promisify(fs.exists);
 const renameAsync = util.promisify(fs.rename);
 
-var currentPassLog = 0;
+const debug = false;
 
-module.exports.execOptions = {
-    cwd: __dirname + "/cache/ffmpeg"
-}
+var currentPassLog = 0;
 
 module.exports.disableVideoDownload = false;
 module.exports.maxVideoDownloadSize = 100 * 1024 * 1024;
 module.exports.maxVideoCompressLength = 100;
 
-module.exports.compressVideo = async function (inputPath, outputPath, targetBitrate, targetFramerate = 24, targetAudioBitrate = 35000) 
-{
-    const passLogPrefix = "ffmpegpass" + currentPassLog++;
+module.exports.compressVideo = async function (
+    inputPath,
+    outputPath,
+    targetBitrate,
+    targetFramerate = 24,
+    targetAudioBitrate = 35000
+) {
+    const passLogPrefix = "cache/ffmpeg/ffmpegpass" + currentPassLog++;
 
     var stdout, stderr;
-    try
-    {
+    try {
         var startTime = process.hrtime();
 
-        var { stdout, stderr } = await execAsync(`ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 1 -passlogfile "${passLogPrefix}" -an -f mp4 /dev/null`, module.exports.execOptions);
-        var { stdout, stderr } = await execAsync(`ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 2 -passlogfile "${passLogPrefix}" -c:a copy -b:a ${targetAudioBitrate} "${outputPath}"`, module.exports.execOptions);
+        var ffmpegCmd = `ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 1 -passlogfile "${passLogPrefix}" -an -f mp4 /dev/null`;
+        if (debug) console.log(`[video] (debug) compressVideo: execute ffmpeg: ${ffmpegCmd}`);
+        var { stdout, stderr } = await execAsync(ffmpegCmd);
+        ffmpegCmd = `ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 2 -passlogfile "${passLogPrefix}" -c:a copy -b:a ${targetAudioBitrate} "${outputPath}"`;
+        if (debug) console.log(`[video] (debug) compressVideo: execute ffmpeg: ${ffmpegCmd}`);
+        var { stdout, stderr } = await execAsync(ffmpegCmd);
 
         var took = process.hrtime(startTime);
-        console.log("[compressVideo] Done, took", took[0] * 1000 + took[1] / 1000000, "ms");
-    }
-    catch (ex) 
-    {
-        console.error("[compressVideo] Error:", ex.message, stdout, stderr);
+        console.log("[video] compressVideo: took", took[0] * 1000 + took[1] / 1000000, "ms");
+    } catch (ex) {
+        console.error("[video] (error) compressVideo:", ex.message, stdout, stderr);
         throw ex;
     }
-}
+};
 
-module.exports.getVideoInfo = async function (inputPath)
-{
+module.exports.getVideoInfo = async function (inputPath) {
     var stdout, stderr;
-    try
-    {
-        var { stdout, stderr } = await execAsync(`ffprobe -i "${inputPath}" -v quiet -print_format json -show_format -hide_banner`, module.exports.execOptions);
+    try {
+        const probeCmd = `ffprobe -i "${inputPath}" -v quiet -print_format json -show_format -hide_banner`;
+        if (debug) console.log(`[video] (debug) getVideoInfo: execute probe: ${probeCmd}`);
+        var { stdout, stderr } = await execAsync(probeCmd);
         return JSON.parse(stdout);
-    }
-    catch (ex)
-    {
-        console.error("[getVideoInfo] Error:", ex.message, stdout, stderr);
+    } catch (ex) {
+        console.error("[video] (error) getVideoInfo:", ex.message, stdout, stderr);
         throw ex;
     }
-}
+};
 
-module.exports.getPathForVideo = function (videoUrl, maxVideoSize)
-{
+module.exports.getPathForVideo = function (videoUrl, maxVideoSize) {
     const videoUrlHash = crypto.createHash("sha1").update(videoUrl, "binary").digest("hex");
     return __dirname + "/cache/videos/" + videoUrlHash + "-" + maxVideoSize + ".mp4";
-}
+};
 
 var videoWaiters = {};
 
-module.exports.getCachedVideo = async function (videoUrl, maxVideoFileSize = 1000 * 1000 * 8, doNotDownload = false) 
-{
-    if (!(videoUrl in videoWaiters)) 
-    {
-        videoWaiters[videoUrl] = module.exports.getCachedVideoTask(videoUrl, maxVideoFileSize, doNotDownload);
+module.exports.getCachedVideo = async function (
+    videoUrl,
+    maxVideoFileSize = 1000 * 1000 * 8,
+    doNotDownload = false
+) {
+    if (!(videoUrl in videoWaiters)) {
+        videoWaiters[videoUrl] = module.exports.getCachedVideoTask(
+            videoUrl,
+            maxVideoFileSize,
+            doNotDownload
+        );
     }
 
     var res = await videoWaiters[videoUrl];
     delete videoWaiters[videoUrl];
     return res;
-}
+};
 
-module.exports.getCachedVideoTask = async function (videoUrl, maxVideoFileSize = 1000 * 1000 * 8, doNotDownload = false)
-{
-    try
-    {
+module.exports.getCachedVideoTask = async function (
+    videoUrl,
+    maxVideoFileSize = 1000 * 1000 * 8,
+    doNotDownload = false
+) {
+    try {
         const videoFile = module.exports.getPathForVideo(videoUrl, maxVideoFileSize);
 
         if (await existsAsync(videoFile)) return videoFile;
@@ -83,40 +92,50 @@ module.exports.getCachedVideoTask = async function (videoUrl, maxVideoFileSize =
 
         // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
         const tempVideoFile = videoFile + ".temp.mp4";
-        await execAsync(
-            `youtube-dl -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${module.exports.maxVideoDownloadSize} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFile}" "${videoUrl}"`, // --no-warnings --print-json --no-progress
-            module.exports.execOptions
-        );
+        const youtubeCmd = `youtube-dl -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${module.exports.maxVideoDownloadSize} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFile}" "${videoUrl}"`; // --no-warnings --print-json --no-progress;
+        if (debug)
+            console.log(`[video] (debug) getCachedVideoTask: execute youtube-dl: ${youtubeCmd}`);
+        await execAsync(youtubeCmd);
 
         // Will error is file not exists
         const videoInfo = await module.exports.getVideoInfo(tempVideoFile);
 
-        if (!videoInfo.format.duration || videoInfo.format.duration > module.exports.maxVideoCompressLength)
+        if (
+            !videoInfo.format.duration ||
+            videoInfo.format.duration > module.exports.maxVideoCompressLength
+        )
             throw new Error("Invalid duration: " + videoInfo.format.duration);
 
         // Reencode if too large or if mpegts file (discord does not display these)
-        if (videoInfo.format.size > maxVideoFileSize || videoInfo.format.format_name.includes("mpegts") || videoInfo.format.format_name.includes("gif"))
-        {
-            //var test = null ?? null;
-
-            console.log("[getCachedVideoTask] Compressing, video format:", videoInfo.format);
+        if (
+            videoInfo.format.size > maxVideoFileSize ||
+            videoInfo.format.format_name.includes("mpegts") ||
+            videoInfo.format.format_name.includes("gif")
+        ) {
+            console.log("[video] getCachedVideoTask: compressing, video format:", videoInfo.format);
             const targetAudioBitrate = 35000;
             const targetFramerate = 24;
-            const targetBitrate = (maxVideoFileSize * 8) / (videoInfo.format.duration * 1.4) - targetAudioBitrate;
-            await module.exports.compressVideo(tempVideoFile, videoFile, targetBitrate, targetFramerate, targetAudioBitrate);
+            const targetBitrate =
+                (maxVideoFileSize * 8) / (videoInfo.format.duration * 1.4) - targetAudioBitrate;
+            await module.exports.compressVideo(
+                tempVideoFile,
+                videoFile,
+                targetBitrate,
+                targetFramerate,
+                targetAudioBitrate
+            );
 
-            fs.unlink(tempVideoFile, () => { });
-        }
-        else
-        {
+            fs.unlink(tempVideoFile, () => {});
+        } else {
             await renameAsync(tempVideoFile, videoFile);
         }
 
         return videoFile;
-    }
-    catch (ex)
-    {
-        console.warn("[ensureCachedVideo] Error: Could not upload/convert video: ", ex.message);
+    } catch (ex) {
+        console.warn(
+            "[video] (error) getCachedVideoTask: could not upload/convert video:",
+            ex.message
+        );
         return null;
     }
-}
+};

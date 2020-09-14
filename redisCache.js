@@ -16,6 +16,8 @@ const rkeysAsync = util.promisify(redisClient.keys).bind(redisClient);
 const rgetAsync = util.promisify(redisClient.get).bind(redisClient);
 const rsetexAsync = util.promisify(redisClient.setex).bind(redisClient);
 
+const debug = false;
+
 module.exports.cachePerPages = 30;
 module.exports.cacheRedditResponseTtl = 60 * 60 * 2;
 module.exports.cacheNotTopIndexTtl = 60 * 60 * 12;
@@ -30,9 +32,7 @@ module.exports.getChannelSubredditIndexKey = function (
     channelId
 ) {
     return `r${subredditName}:${
-        subredditMode === "top"
-            ? subredditMode + ":" + subredditTopTimespan
-            : subredditMode
+        subredditMode === "top" ? subredditMode + ":" + subredditTopTimespan : subredditMode
     }:ch${channelId}:idx`;
 };
 
@@ -58,10 +58,7 @@ module.exports.setChannelSubredditIndex = async function (
     channelId,
     index
 ) {
-    const ttl = module.exports.getTtlForRedditIndex(
-        subredditMode,
-        subredditTopTimespan
-    );
+    const ttl = module.exports.getTtlForRedditIndex(subredditMode, subredditTopTimespan);
     const indexKey = module.exports.getChannelSubredditIndexKey(
         subredditName,
         subredditMode,
@@ -75,11 +72,7 @@ module.exports.getPreviousUserInputKey = function (channelId, userId) {
     return `ch${channelId}:u${userId}:prev`;
 };
 
-module.exports.setPreviousUserInput = async function (
-    channelId,
-    userId,
-    input
-) {
+module.exports.setPreviousUserInput = async function (channelId, userId, input) {
     const key = module.exports.getPreviousUserInputKey(channelId, userId);
     await rsetexAsync(key, module.exports.cachePreviousUserInputTtl, input);
 };
@@ -122,9 +115,7 @@ module.exports.cacheResponse = function (
     page,
     callback = null
 ) {
-    const baseKey = `r${subredditName}:${
-        mode === "top" ? mode + ":" + timespan : mode
-    }`;
+    const baseKey = `r${subredditName}:${mode === "top" ? mode + ":" + timespan : mode}`;
     var chain = redisClient.multi();
     chain = chain.setex(
         `${baseKey}:p${page}:data`,
@@ -132,21 +123,13 @@ module.exports.cacheResponse = function (
         JSON.stringify(data)
     );
     const indexTtl = module.exports.getTtlForRedditIndex(mode, timespan);
-    if (indexTtl > 0)
-        chain = chain.setex(`${baseKey}:p${page}:after`, indexTtl, data.after);
+    if (indexTtl > 0) chain = chain.setex(`${baseKey}:p${page}:after`, indexTtl, data.after);
     else chain = chain.set(`${baseKey}:p${page}:after`, data.after);
     chain.exec(callback);
 };
 
-module.exports.getResponse = async function (
-    subredditName,
-    mode,
-    timespan,
-    page
-) {
-    const baseKey = `r${subredditName}:${
-        mode === "top" ? mode + ":" + timespan : mode
-    }`;
+module.exports.getResponse = async function (subredditName, mode, timespan, page) {
+    const baseKey = `r${subredditName}:${mode === "top" ? mode + ":" + timespan : mode}`;
     var cachedData = await rgetAsync(`${baseKey}:p${page}:data`);
     if (cachedData) return JSON.parse(cachedData);
     else return null;
@@ -162,19 +145,15 @@ module.exports.getUserIcon = async function (user, fast = false) {
         } else {
             var response;
             try {
-                response = await ax.get(
-                    `https://api.reddit.com/user/${user}/about`
-                );
+                response = await ax.get(`https://api.reddit.com/user/${user}/about`);
             } catch (ex) {
                 console.warn(
-                    "[CachedReddit/Error] Could not get user icon:",
+                    "[redis-cache] (warning) getUserIcon: could not get user icon:",
                     ex.message
                 );
                 return module.exports.getRandomDefaultUserIcon();
             }
-            icon =
-                response.data.data.icon_img ||
-                module.exports.getRandomDefaultUserIcon();
+            icon = response.data.data.icon_img || module.exports.getRandomDefaultUserIcon();
             rsetexAsync(iconKey, module.exports.cacheUserIconTtl, icon);
         }
     }
@@ -190,12 +169,10 @@ module.exports.getSubredditIcon = async function (subredditName, fast = false) {
         } else {
             var response;
             try {
-                response = await ax.get(
-                    `https://api.reddit.com/r/${subredditName}/about`
-                );
+                response = await ax.get(`https://api.reddit.com/r/${subredditName}/about`);
             } catch (ex) {
                 console.warn(
-                    "[CachedReddit/Error] Could not get subreddit icon:",
+                    "[redis-cache] (warning) getSubredditIcon: could not get subreddit icon:",
                     ex.message
                 );
                 return "";
@@ -209,9 +186,7 @@ module.exports.getSubredditIcon = async function (subredditName, fast = false) {
 
 module.exports.getRandomDefaultUserIcon = function () {
     // https://www.reddit.com/user/timawesomeness/comments/813jpq/default_reddit_profile_pictures/
-    const randomTextureId = (Math.floor(Math.random() * 20) + 1)
-        .toString()
-        .padStart(2, "0");
+    const randomTextureId = (Math.floor(Math.random() * 20) + 1).toString().padStart(2, "0");
     const possibleColors = [
         "A5A4A4",
         "545452",
@@ -239,8 +214,7 @@ module.exports.getRandomDefaultUserIcon = function () {
         "EA0027",
         "FF585B",
     ];
-    const randomColor =
-        possibleColors[Math.floor(Math.random() * possibleColors.length)];
+    const randomColor = possibleColors[Math.floor(Math.random() * possibleColors.length)];
     return `https://www.redditstatic.com/avatars/avatar_default_${randomTextureId}_${randomColor}.png`;
 };
 
@@ -253,9 +227,7 @@ module.exports.getRedditPost = async function (subredditName, postId) {
         url = `https://api.reddit.com/comments/${postId}`;
     }
     const response = await ax.get(url);
-    var data = Array.isArray(response.data)
-        ? response.data[0].data
-        : response.data.data;
+    var data = Array.isArray(response.data) ? response.data[0].data : response.data.data;
     return data.children[0].data;
 };
 
@@ -279,12 +251,7 @@ module.exports.getCachedRedditItem = async function (
         const clampedIndex = index % module.exports.cachePerPages;
 
         if (useCache) {
-            var cachedData = await module.exports.getResponse(
-                subredditName,
-                mode,
-                timespan,
-                page
-            );
+            var cachedData = await module.exports.getResponse(subredditName, mode, timespan, page);
             if (cachedData && clampedIndex < cachedData.children.length)
                 return cachedData.children[clampedIndex].data;
         }
@@ -292,25 +259,23 @@ module.exports.getCachedRedditItem = async function (
         var after = null;
         if (page > 0) {
             after = await rgetAsync(
-                `r${subredditName}:${
-                    mode === "top" ? mode + ":" + timespan : mode
-                }:p${page - 1}:after`
+                `r${subredditName}:${mode === "top" ? mode + ":" + timespan : mode}:p${
+                    page - 1
+                }:after`
             );
             if (!after) {
                 console.warn(
-                    "[getCachedRedditItem] Warning: could not get 'after', probably end of feed"
+                    "[redis-cache] (warning) getCachedRedditItem: could not get 'after', probably end of feed"
                 );
                 return null;
             }
         }
 
         const url = `https://api.reddit.com/r/${subredditName}/${mode}?limit=${module.exports.cachePerPages}&after=${after}&t=${timespan}`;
-        console.log("[getCachedRedditItem]", url);
+        if (debug) console.log("[redis-cache] (debug) getcachedRedditItem:", url);
 
         var response = await ax.get(url);
-        var data = Array.isArray(response.data)
-            ? response.data[0].data
-            : response.data.data;
+        var data = Array.isArray(response.data) ? response.data[0].data : response.data.data;
         if (data.children.length <= 0 || !data.children[0].data.subreddit)
             throw new Error("Reddit did not respond with any posts.");
 
@@ -322,13 +287,13 @@ module.exports.getCachedRedditItem = async function (
             return data.children[clampedIndex].data;
         } else {
             console.warn(
-                "[getCachedRedditItem] Warning: returned null, the response did not contains enough items."
+                "[redis-cache] (warning) getCachedRedditItem: returning null, the response did not contains enough items."
             );
             return null;
         }
     } catch (ex) {
         console.error(
-            "[getCachedRedditItem] Error: could not get subreddit items:",
+            "[redis-cache] (error) getCachedRedditItem: could not get subreddit items:",
             ex.message
         );
         throw ex;
