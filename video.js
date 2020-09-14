@@ -11,7 +11,7 @@ var currentPassLog = 0;
 
 module.exports.disableVideoDownload = false;
 module.exports.maxVideoDownloadSize = 100 * 1024 * 1024;
-module.exports.maxVideoCompressLength = 100;
+module.exports.maxVideoCompressLength = 1000; //100;
 
 module.exports.compressVideo = async function (
     inputPath,
@@ -26,17 +26,17 @@ module.exports.compressVideo = async function (
     try {
         var startTime = process.hrtime();
 
-        var ffmpegCmd = `ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 1 -passlogfile "${passLogPrefix}" -an -f mp4 /dev/null`;
+        var ffmpegCmd = `ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -strict -2 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 1 -passlogfile "${passLogPrefix}" -an -f mp4 /dev/null`;
         if (debug) console.log(`[video] (debug) compressVideo: execute ffmpeg: ${ffmpegCmd}`);
         var { stdout, stderr } = await execAsync(ffmpegCmd);
-        ffmpegCmd = `ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 2 -passlogfile "${passLogPrefix}" -c:a copy -b:a ${targetAudioBitrate} "${outputPath}"`;
+        ffmpegCmd = `ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -strict -2 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 2 -passlogfile "${passLogPrefix}" -c:a copy -b:a ${targetAudioBitrate} "${outputPath}"`;
         if (debug) console.log(`[video] (debug) compressVideo: execute ffmpeg: ${ffmpegCmd}`);
         var { stdout, stderr } = await execAsync(ffmpegCmd);
 
         var took = process.hrtime(startTime);
         console.log("[video] compressVideo: took", took[0] * 1000 + took[1] / 1000000, "ms");
     } catch (ex) {
-        console.error("[video] (error) compressVideo:", ex.message, stdout, stderr);
+        console.error("[video] (error) compressVideo:", ex.message, stderr);
         throw ex;
     }
 };
