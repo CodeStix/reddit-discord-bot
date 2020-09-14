@@ -1,6 +1,7 @@
 const util = require("util");
 const execAsync = util.promisify(require("child_process").exec);
 const fs = require("fs");
+const path = require("path");
 const crypto = require("crypto");
 const existsAsync = util.promisify(fs.exists);
 const renameAsync = util.promisify(fs.rename);
@@ -20,16 +21,16 @@ module.exports.compressVideo = async function (
     targetFramerate = 24,
     targetAudioBitrate = 35000
 ) {
-    const passLogPrefix = "cache/ffmpeg/ffmpegpass" + currentPassLog++;
+    const passLogPath = path.join(__dirname, "cache/ffmpeg/ffmpegpass" + currentPassLog++);
 
     var stdout, stderr;
     try {
         var startTime = process.hrtime();
 
-        var ffmpegCmd = `ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -strict -2 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 1 -passlogfile "${passLogPrefix}" -an -f mp4 /dev/null`;
+        var ffmpegCmd = `ffmpeg -y -i "${inputPath}" -c:v libx264 -strict -2 -passlogfile "${passLogPath}" -r ${targetFramerate} -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 1 -an -f mp4 /dev/null`;
         if (debug) console.log(`[video] (debug) compressVideo: execute ffmpeg: ${ffmpegCmd}`);
         var { stdout, stderr } = await execAsync(ffmpegCmd);
-        ffmpegCmd = `ffmpeg -y -i "${inputPath}" -r ${targetFramerate} -c:v libx264 -strict -2 -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 2 -passlogfile "${passLogPrefix}" -c:a copy -b:a ${targetAudioBitrate} "${outputPath}"`;
+        ffmpegCmd = `ffmpeg -y -i "${inputPath}" -c:v libx264 -strict -2 -passlogfile "${passLogPath}" -r ${targetFramerate} -tune fastdecode -preset ultrafast -b:v ${targetBitrate} -pass 2 -c:a copy -b:a ${targetAudioBitrate} "${outputPath}"`;
         if (debug) console.log(`[video] (debug) compressVideo: execute ffmpeg: ${ffmpegCmd}`);
         var { stdout, stderr } = await execAsync(ffmpegCmd);
 
@@ -56,7 +57,8 @@ module.exports.getVideoInfo = async function (inputPath) {
 
 module.exports.getPathForVideo = function (videoUrl, maxVideoSize) {
     const videoUrlHash = crypto.createHash("sha1").update(videoUrl, "binary").digest("hex");
-    return __dirname + "/cache/videos/" + videoUrlHash + "-" + maxVideoSize + ".mp4";
+    const videoFileName = videoUrlHash + "-" + maxVideoSize + ".mp4";
+    return path.join(__dirname, "cache/videos/" + videoFileName);
 };
 
 var videoWaiters = {};
