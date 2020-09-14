@@ -39,6 +39,15 @@ module.exports.compressVideo = async function (
     } catch (ex) {
         console.error("[video] (error) compressVideo:", ex.message, stderr);
         throw ex;
+    } finally {
+        // remove the by ffmpeg created passlog file
+        fs.unlink(passLogPath + "-0.log", (err) => {
+            if (err)
+                console.warn(
+                    "[video] (warning) compressVideo: could not remove pass log file:",
+                    err
+                );
+        });
     }
 };
 
