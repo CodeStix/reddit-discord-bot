@@ -9,3 +9,4 @@ bin/
 redis.conf
 db/
 .env
+*.rdb
