@@ -16,13 +16,13 @@ The bot uses the `r/` prefix:
 
 Timespans are only valid for the _top_ mode.
 
-![bot prefix usage]()
+![bot prefix usage](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditprefix.png)
 
 ### Embedding
 
 You can also past a reddit url into the chat, the bot will transform it into a nice embedded message.
 
-![reddit url embedding]()
+![reddit url embedding](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditurl.png)
 
 ## Host yourself
 
