@@ -513,8 +513,10 @@ async function processMessage(message) {
     if (userInput && userInput[4]) subredditTopTimespan = userInput[4];
     else if (channelTopicInput && channelTopicInput[4]) subredditTopTimespan = channelTopicInput[4];
 
-    if (subredditTopTimespan && subredditMode !== "top") {
-        message.reply(`⚠️ \`t=${subredditTopTimespan}\` is only valid for *top* filter.`);
+    if (userInput && userInput[4] && subredditMode !== "top") {
+        message.reply(
+            `⚠️ Timespans (\`t=${subredditTopTimespan}\`) are only valid for the *top* filter.`
+        );
         return;
     }
 
