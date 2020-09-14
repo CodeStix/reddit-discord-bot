@@ -8,9 +8,8 @@ mkdir src/cache src/cache/ffmpeg src/cache/videos
 cp redis.conf.example redis.conf
 cp .env.example .env
 
-# install youtube-dl and ffmpeg
-apt install -y youtube-dl
-apt install -y ffmpeg
+# install node, npm, youtube-dl and ffmpeg
+apt install -y nodejs npm youtube-dl ffmpeg
 
 # installing redis
 apt install -y build-essential
@@ -21,6 +20,8 @@ make install
 cd ..
 rm redis-6.0.4.tar.gz
 rm -rf redis-6.0.4
+
+npm install
 
 echo
 echo ---- Installation complete ----
