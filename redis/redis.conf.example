@@ -1,0 +1,10 @@
+bind 127.0.0.1
+port 6970
+dbfilename redditbot.rdb
+requirepass examplePassword
+
+rename-command FLUSHALL "Em9cbWjDv3tj8sDmBGEbqApDEKn63eAW"
+rename-command FLUSHDB "n3L6Z5nekAvnsbVmfPgFmk2DzU6mfnfy"
+rename-command CONFIG "Tp3EeEYg4XPYNvHdXtV8KLTAmUdvdSJ2"
+rename-command SHUTDOWN "kpxuz6zp54WVncha86zfn5nGhWuXJQEy"
+rename-command DEBUG "ksvuHGG6NHzqa97pRkeF5VeLK7gLhmw7"
