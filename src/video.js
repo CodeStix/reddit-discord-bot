@@ -12,7 +12,7 @@ var currentPassLog = 0;
 
 module.exports.disableVideoDownload = false;
 module.exports.maxVideoDownloadSize = 100 * 1024 * 1024;
-module.exports.maxVideoCompressLength = 1000; //100;
+module.exports.maxVideoCompressLength = 120;
 
 module.exports.compressVideo = async function (
     inputPath,
