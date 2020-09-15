@@ -112,51 +112,6 @@ function getFileNameForUrl(url) {
  */
 async function sendRedditAttachment(channel, url, isVideo, markSpoiler) {
     const fileName = getFileNameForUrl(url);
-    /**
-     * @param {string} url
-     * @param {'url' | 'image' | 'video'} type
-     */
-    async function sendAs(url, type, message = "") {
-        switch (type) {
-            case "url":
-                if (markSpoiler)
-                    await channel.send(message + "||" + url + "||", {
-                        spoiler: true,
-                    });
-                else await channel.send(message + url);
-                break;
-            case "image":
-                if (markSpoiler)
-                    await channel.send(
-                        message,
-                        new MessageAttachment(url, `SPOILER_${fileName}.png`)
-                    );
-                else
-                    await channel.send(
-                        message,
-                        new MessageAttachment(url, `image-${fileName}.png`)
-                    );
-                break;
-            case "video":
-                if (markSpoiler)
-                    await channel.send(
-                        message,
-                        new MessageAttachment(url, `SPOILER_${fileName}.mp4`)
-                    );
-                else
-                    await channel.send(
-                        message,
-                        new MessageAttachment(url, `video-${fileName}.mp4`)
-                    );
-                break;
-            default:
-                console.error(
-                    "[reddit-bot] (error) sendRedditAttachment: invalid sendAsSpoiler type",
-                    type
-                );
-                return;
-        }
-    }
 
     if (isVideo) {
         try {
@@ -171,10 +126,12 @@ async function sendRedditAttachment(channel, url, isVideo, markSpoiler) {
             await channel.send("", new MessageAttachment(videoFile, name));
         } catch (ex) {
             console.warn(
-                "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending as url:",
+                "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending url instead:",
                 ex
             );
-            await sendAs(url, "url", `⚠️ **${ex.message}** `);
+            await channel.send("||" + url + "||", {
+                spoiler: true,
+            });
         }
     } else if (
         url.endsWith(".gif") ||
@@ -184,16 +141,21 @@ async function sendRedditAttachment(channel, url, isVideo, markSpoiler) {
         url.startsWith("https://i.postimg.cc/")
     ) {
         try {
-            await sendAs(url, "image");
+            const name = markSpoiler ? `SPOILER_${fileName}.png` : `image-${fileName}.png`;
+            await channel.send("", new MessageAttachment(url, name));
         } catch (ex) {
             console.warn(
-                "[reddit-bot] (warning) sendRedditAttachment: could not send image:",
+                "[reddit-bot] (warning) sendRedditAttachment: could not send image, sending url instead:",
                 ex.message
             );
-            await sendAs(url, "url", "⚠️ **Error while uploading image, take a url:** ");
+            await channel.send("||" + url + "||", {
+                spoiler: true,
+            });
         }
     } else {
-        await sendAs(url, "url");
+        await channel.send("||" + url + "||", {
+            spoiler: true,
+        });
     }
 }
 
