@@ -25,15 +25,56 @@ module.exports.cacheSubredditIconTtl = 60 * 60 * 24 * 16; // remember the subred
 module.exports.cacheUserIconTtl = 60 * 60 * 24 * 4; // remember the user icon for x seconds
 module.exports.cachePreviousUserInputTtl = 60 * 60 * 28; // remember the user's previous subreddit for x seconds
 
-module.exports.getChannelSubredditIndexKey = function (
+module.exports.getFullSubredditChannelKey = function (
     subredditName,
     subredditMode,
     subredditTopTimespan,
-    channelId
+    channelId,
+    field
+) {
+    return module.exports.getFullSubredditKey(
+        subredditName,
+        subredditMode,
+        subredditTopTimespan,
+        `ch${channelId}:${field}`
+    );
+};
+
+module.exports.getChannelUserKey = function (channelId, userId, field) {
+    return `ch${channelId}:u${userId}:${field}`;
+};
+
+module.exports.getFullSubredditKey = function (
+    subredditName,
+    subredditMode,
+    subredditTopTimespan,
+    field
 ) {
     return `r${subredditName}:${
         subredditMode === "top" ? subredditMode + ":" + subredditTopTimespan : subredditMode
-    }:ch${channelId}:idx`;
+    }:${field}`;
+};
+module.exports.getFullSubredditPageKey = function (
+    subredditName,
+    subredditMode,
+    subredditTopTimespan,
+    page,
+    field
+) {
+    return module.exports.getFullSubredditKey(
+        subredditName,
+        subredditMode,
+        subredditTopTimespan,
+        `p${page}:${field}`
+    );
+};
+
+module.exports.getSubredditIconKey = function (subredditName) {
+    return `r${subredditName.toLowerCase()}:icon`;
+};
+
+module.exports.getUserKey = function (user, field) {
+    return `u${user.toLowerCase()}:${field}`;
 };
 
 module.exports.getChannelSubredditIndex = async function (
@@ -42,11 +83,12 @@ module.exports.getChannelSubredditIndex = async function (
     subredditTopTimespan,
     channelId
 ) {
-    const indexKey = module.exports.getChannelSubredditIndexKey(
+    const indexKey = module.exports.getFullSubredditChannelKey(
         subredditName,
         subredditMode,
         subredditTopTimespan,
-        channelId
+        channelId,
+        "idx"
     );
     return parseInt(await rgetAsync(indexKey)) || 0;
 };
@@ -59,26 +101,23 @@ module.exports.setChannelSubredditIndex = async function (
     index
 ) {
     const ttl = module.exports.getTtlForRedditIndex(subredditMode, subredditTopTimespan);
-    const indexKey = module.exports.getChannelSubredditIndexKey(
+    const indexKey = module.exports.getFullSubredditChannelKey(
         subredditName,
         subredditMode,
         subredditTopTimespan,
-        channelId
+        channelId,
+        "idx"
     );
     await rsetexAsync(indexKey, ttl, index);
 };
 
-module.exports.getPreviousUserInputKey = function (channelId, userId) {
-    return `ch${channelId}:u${userId}:prev`;
-};
-
 module.exports.setPreviousUserInput = async function (channelId, userId, input) {
-    const key = module.exports.getPreviousUserInputKey(channelId, userId);
+    const key = module.exports.getChannelUserKey(channelId, userId, "prev");
     await rsetexAsync(key, module.exports.cachePreviousUserInputTtl, input);
 };
 
 module.exports.getPreviousUserInput = async function (channelId, userId) {
-    const key = module.exports.getPreviousUserInputKey(channelId, userId);
+    const key = module.exports.getChannelUserKey(channelId, userId, "prev");
     return await rgetAsync(key);
 };
 
@@ -115,29 +154,45 @@ module.exports.cacheResponse = function (
     page,
     callback = null
 ) {
-    const baseKey = `r${subredditName}:${mode === "top" ? mode + ":" + timespan : mode}`;
+    const dataKey = module.exports.getFullSubredditPageKey(
+        subredditName,
+        mode,
+        timespan,
+        page,
+        "data"
+    );
     var chain = redisClient.multi();
-    chain = chain.setex(
-        `${baseKey}:p${page}:data`,
-        module.exports.cacheRedditResponseTtl,
-        JSON.stringify(data)
+    chain = chain.setex(dataKey, module.exports.cacheRedditResponseTtl, JSON.stringify(data));
+
+    const afterKey = module.exports.getFullSubredditPageKey(
+        subredditName,
+        mode,
+        timespan,
+        page,
+        "after"
     );
     const indexTtl = module.exports.getTtlForRedditIndex(mode, timespan);
-    if (indexTtl > 0) chain = chain.setex(`${baseKey}:p${page}:after`, indexTtl, data.after);
-    else chain = chain.set(`${baseKey}:p${page}:after`, data.after);
+    if (indexTtl > 0) chain = chain.setex(afterKey, indexTtl, data.after);
+    else chain = chain.set(afterKey, data.after);
     chain.exec(callback);
 };
 
 module.exports.getResponse = async function (subredditName, mode, timespan, page) {
-    const baseKey = `r${subredditName}:${mode === "top" ? mode + ":" + timespan : mode}`;
-    var cachedData = await rgetAsync(`${baseKey}:p${page}:data`);
+    const dataKey = module.exports.getFullSubredditPageKey(
+        subredditName,
+        mode,
+        timespan,
+        page,
+        "data"
+    );
+    var cachedData = await rgetAsync(dataKey);
     if (cachedData) return JSON.parse(cachedData);
     else return null;
 };
 
 module.exports.getUserIcon = async function (user, fast = false) {
     if (!user || user === "[deleted]") return null;
-    const iconKey = `u${user.toLowerCase()}:icon`;
+    const iconKey = module.exports.getUserKey(user, "icon");
     var icon = await rgetAsync(iconKey);
     if (!icon) {
         if (fast) {
@@ -161,7 +216,7 @@ module.exports.getUserIcon = async function (user, fast = false) {
 };
 
 module.exports.getSubredditIcon = async function (subredditName, fast = false) {
-    const iconKey = `r${subredditName.toLowerCase()}:icon`;
+    const iconKey = module.exports.getSubredditIconKey(subredditName);
     var icon = await rgetAsync(iconKey);
     if (!icon) {
         if (fast) {
@@ -259,9 +314,13 @@ module.exports.getCachedRedditItem = async function (
         var after = null;
         if (page > 0) {
             after = await rgetAsync(
-                `r${subredditName}:${mode === "top" ? mode + ":" + timespan : mode}:p${
-                    page - 1
-                }:after`
+                module.exports.getFullSubredditPageKey(
+                    subredditName,
+                    mode,
+                    timespan,
+                    page - 1,
+                    "after"
+                )
             );
             if (!after) {
                 console.warn(
