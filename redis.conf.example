@@ -3,7 +3,7 @@ port 6970
 dbfilename redditbot.rdb
 requirepass yourredispassword
 dir .
-save 30 4
+save 120 10
 
 # you should change these for security
 rename-command FLUSHALL "Em9chhbWjDv3tj8sDmBGEbsdfqApDEKn63eAW"
