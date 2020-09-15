@@ -244,6 +244,8 @@ function isVideoUrl(url) {
         url.endsWith(".mp4") ||
         url.startsWith("https://v.redd.it/") ||
         url.startsWith("https://streamable.com/") ||
+        url.startsWith("http://clips.twitch.tv/") ||
+        url.startsWith("https://clips.twitch.tv/") ||
         url.startsWith("https://twitter.com/") ||
         url.startsWith("https://gfycat.com/")
     );
