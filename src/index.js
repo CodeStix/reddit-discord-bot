@@ -409,19 +409,40 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
     return [redditItem, index];
 }
 
-// 'hour' | 'day' | 'week' | 'month' | 'year' | 'all'
-const redditInputRegex = /(?:https?:\/\/(?:www\.)?reddit\.com\/)?r\/([a-z0-9 _]{1,20})?(?:\/(?:(hot|rising|new|best|top)|comments\/([a-z0-9]+)))?(?:[\?\&]t=(hour|day|week|month|year|all))?/i;
+async function processPostMessage(message) {
+    var redditItem;
+    try {
+        redditItem = await redditCache.getRedditPost(userInput[1], userInput[3]);
+    } catch (ex) {
+        console.error("[reddit-bot] processMessage: could not embed post:", ex);
+        message.channel.send(
+            new MessageEmbed()
+                .setTitle("❌ Reddit error!")
+                .setDescription(
+                    `There was a problem getting the post, I am very sorry. (*${ex.message}*)`
+                )
+                .setColor("#ff0000")
+                .setThumbnail(sadRedditIcon)
+        );
+        return;
+    }
 
-/**
- * @param {Message} message
- */
-async function processMessage(message) {
-    if (message.author.bot) return;
+    await message.suppressEmbeds(true);
+    await sendRedditItem(message.channel, redditItem);
+}
 
-    var input = (message.content || "").trim().toLowerCase();
-    if (!input.startsWith("r/") && !input.startsWith("https://www.reddit.com/r/")) return;
-
-    if (input === "r//") {
+async function processPrefixMessage(message) {
+    var input = message.content.substring(2).toLowerCase().trim();
+    console.log(`[reddit-bot] input '${input}'`);
+    if (input === "" || input === "help" || input === "?") {
+        message.reply("help");
+        return;
+    } else if (input.startsWith("/")) {
+        if (input.length > 1) {
+            message.reply(
+                "Warning: you have to retype your whole statement if your want to change the filter. **r//** simply just reuses your previous input."
+            );
+        }
         input = await redditCache.getPreviousUserInput(message.channel.id, message.author.id);
         if (!input) {
             message.reply("I don't remember your previous input, please type it yourself.");
@@ -429,68 +450,24 @@ async function processMessage(message) {
         }
     }
 
-    console.log(`[reddit-bot] processMessage: input '${input}'`);
-
-    if (input.startsWith("https://www.reddit.com/r/")) await message.suppressEmbeds(true); // disable the embed created by discord
-
-    // 0: -
-    // 1: subredditName
-    // 2: subredditMode
-    // 3: post id (if subredditMode == null)
-    // 4: timespan (if subredditMode == top)
-    var userInput = redditInputRegex.exec(input);
-    var channelTopicInput = redditInputRegex.exec(
-        (message.channel.topic || "").trim().toLowerCase()
-    );
-
-    const isPost = !userInput[2] && userInput[3];
-    if (isPost) {
-        var redditItem;
-        try {
-            redditItem = await redditCache.getRedditPost(userInput[1], userInput[3]);
-        } catch (ex) {
-            console.error("[reddit-bot] processMessage: could not embed post:", ex);
-            message.channel.send(
-                new MessageEmbed()
-                    .setTitle("❌ Reddit error!")
-                    .setDescription(
-                        `There was a problem getting the post, I am very sorry. (*${ex.message}*)`
-                    )
-                    .setColor("#ff0000")
-                    .setThumbnail(sadRedditIcon)
-            );
-            return;
-        }
-
-        sendRedditItem(message.channel, redditItem);
-        return;
-    }
-
-    var subredditName,
+    var splitted = input.split(/ |\//g);
+    var subredditName = splitted[0],
         subredditMode = "top",
-        subredditTopTimespan = "month";
+        subredditTopTimespan = "week";
 
-    if (userInput && userInput[1]) {
-        subredditName = userInput[1];
-    } else if (channelTopicInput && channelTopicInput[1]) {
-        subredditName = channelTopicInput[1];
-    } else {
-        message.reply("No subreddit specified by user and channel.");
-        return;
+    if (splitted[1]) {
+        if (["hour", "day", "week", "month", "year", "all"].includes(splitted[1])) {
+            subredditMode = "top";
+            subredditTopTimespan = splitted[1];
+        } else {
+            subredditMode = splitted[1];
+        }
+    }
+    if (splitted[2]) {
+        subredditTopTimespan = splitted[2];
     }
 
-    if (userInput && userInput[2]) subredditMode = userInput[2];
-    else if (channelTopicInput && channelTopicInput[2]) subredditMode = channelTopicInput[2];
-
-    if (userInput && userInput[4]) subredditTopTimespan = userInput[4];
-    else if (channelTopicInput && channelTopicInput[4]) subredditTopTimespan = channelTopicInput[4];
-
-    if (userInput && userInput[4] && subredditMode !== "top") {
-        message.reply(
-            `⚠️ Timespans (\`t=${subredditTopTimespan}\`) are only valid for the *top* filter.`
-        );
-        return;
-    }
+    console.log("[reddit-bot] (debug)", subredditName, subredditMode, subredditTopTimespan);
 
     if (subredditName === "typeyoursubreddithere") {
         message.reply("Are you really that stupid? 😐");
@@ -541,9 +518,9 @@ async function processMessage(message) {
     if (index === 0 && redditItem == null) {
         message.channel.send(
             new MessageEmbed()
-                .setTitle("⚠️ Begin of feed!")
+                .setTitle("⚠️ End of feed!")
                 .setDescription(
-                    `This is the start of the **r/${subredditName}/${subredditMode}** subreddit, if you request more posts from this subreddit (and filter, ${subredditMode}), you will notice that some will get reposted. Come back later for more recent posts.`
+                    `You reached the end of **r/${subredditName}/${subredditMode}** subreddit, if you request more posts from this subreddit (and filter, ${subredditMode}), you will notice that some will get reposted. Come back later for more recent posts.`
                 )
                 .setColor("#ffff00")
         );
@@ -552,6 +529,32 @@ async function processMessage(message) {
     }
 
     sendRedditItem(message.channel, redditItem);
+}
+
+/**
+ * @param {Message} message
+ */
+async function processMessage(message) {
+    if (message.author.bot) return;
+
+    /*
+        r/              shows help
+        r/help          shows help
+        r/
+        
+        r//             send another post from previously entered subreddit
+        r/test          shows a post from the test subreddit
+        r/test new      shows a new post from the test subreddit
+        r/test top week shows a top post from the last week from the test subreddit
+        r/test month    shows a top post from the last month from the test subreddit
+
+    */
+
+    if (message.content.startsWith("https://www.reddit.com/r/")) {
+        await processPostMessage(message);
+    } else if (message.content.startsWith("r/")) {
+        await processPrefixMessage(message);
+    }
 }
 
 discordBot.on("message", processMessage);
