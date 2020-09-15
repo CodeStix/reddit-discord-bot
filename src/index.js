@@ -399,9 +399,18 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
                             cachedVideoPath
                         );
                 }
+            })
+            .catch((err) => {
+                console.error(
+                    "[reddit-bot] (error) nextRedditItem: could not cache next video:",
+                    err
+                );
             });
 
-        if (++tries > 50) throw new Error("There are no posts that match your filters.");
+        if (++tries > 50)
+            throw new Error(
+                `There are no posts from **${subredditName}** available that match your filters. I'm sorry.`
+            );
 
         index++;
     } while (!redditItemMatchesFilters(redditItem));
@@ -415,15 +424,7 @@ async function processPostMessage(message) {
         redditItem = await redditCache.getRedditPost(userInput[1], userInput[3]);
     } catch (ex) {
         console.error("[reddit-bot] processMessage: could not embed post:", ex);
-        message.channel.send(
-            new MessageEmbed()
-                .setTitle("❌ Reddit error!")
-                .setDescription(
-                    `There was a problem getting the post, I am very sorry. (*${ex.message}*)`
-                )
-                .setColor("#ff0000")
-                .setThumbnail(sadRedditIcon)
-        );
+        message.channel.send(new MessageEmbed().setTitle("❌ " + ex.message).setColor("#FF4301"));
         return;
     }
 
@@ -435,17 +436,39 @@ async function processPrefixMessage(message) {
     var input = message.content.substring(2).toLowerCase().trim();
     console.log(`[reddit-bot] input '${input}'`);
     if (input === "" || input === "help" || input === "?") {
-        message.reply("help");
+        const description = `
+        **You can use the \`r/\` prefix in the following ways:**
+
+         - \`r/pics\`: shows a top post from the r/pics subreddit.
+
+         - \`r/pics new\`: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
+
+         - \`r/pics top\`: shows a top post.
+
+         - \`r/pics top week\` or \`r/pics week\`: shows a top post from the last week.
+
+         ℹ️ **Protip: **You can use the \`r//\` shortcut to repeat your previous input.
+
+         [More information here](https://github.com/CodeStix/reddit-discord-bot)
+        `;
+        message.reply(
+            new MessageEmbed()
+                .setTitle("Reddit Bot Help")
+                .setDescription(description)
+                .setColor("#FF4301")
+        );
         return;
     } else if (input.startsWith("/")) {
         if (input.length > 1) {
             message.reply(
-                "Warning: you have to retype your whole statement if your want to change the filter. **r//** simply just reuses your previous input."
+                "⚠️ **r//** just reuses your previous input, do not type anything after it. Use **r/help** to show instructions."
             );
         }
         input = await redditCache.getPreviousUserInput(message.channel.id, message.author.id);
         if (!input) {
-            message.reply("I don't remember your previous input, please type it yourself.");
+            message.reply(
+                "😬 I'm sorry, I don't remember your previous input, please type it once again."
+            );
             return;
         }
     }
@@ -459,7 +482,7 @@ async function processPrefixMessage(message) {
         if (["hour", "day", "week", "month", "year", "all"].includes(splitted[1])) {
             subredditMode = "top";
             subredditTopTimespan = splitted[1];
-        } else {
+        } else if (["top", "new", "rising", "best", "year", "all"].includes(splitted[1])) {
             subredditMode = splitted[1];
         }
     }
@@ -468,11 +491,6 @@ async function processPrefixMessage(message) {
     }
 
     console.log("[reddit-bot] (debug)", subredditName, subredditMode, subredditTopTimespan);
-
-    if (subredditName === "typeyoursubreddithere") {
-        message.reply("Are you really that stupid? 😐");
-        return;
-    }
 
     var index = await redditCache.getChannelSubredditIndex(
         subredditName,
@@ -494,15 +512,7 @@ async function processPrefixMessage(message) {
             "[reddit-bot] (error) processMessage: getMatchingRedditItem() threw error:",
             ex
         );
-        message.channel.send(
-            new MessageEmbed()
-                .setTitle("❌ Reddit error!")
-                .setDescription(
-                    `There was a problem getting a post from r/${subredditName}/${subredditMode}, I am very sorry. (*${ex.message}*)`
-                )
-                .setColor("#ff0000")
-                .setThumbnail(sadRedditIcon)
-        );
+        message.channel.send(new MessageEmbed().setTitle("❌ " + ex.message).setColor("#FF4301"));
         return;
     }
 
@@ -522,7 +532,7 @@ async function processPrefixMessage(message) {
                 .setDescription(
                     `You reached the end of **r/${subredditName}/${subredditMode}** subreddit, if you request more posts from this subreddit (and filter, ${subredditMode}), you will notice that some will get reposted. Come back later for more recent posts.`
                 )
-                .setColor("#ffff00")
+                .setColor("#FF4301")
         );
 
         return;

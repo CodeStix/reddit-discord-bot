@@ -302,59 +302,46 @@ module.exports.getCachedRedditItem = async function (
 ) {
     subredditName = subredditName.toLowerCase();
     const page = Math.floor(index / module.exports.cachePerPages);
-    try {
-        const clampedIndex = index % module.exports.cachePerPages;
+    const clampedIndex = index % module.exports.cachePerPages;
+    if (useCache) {
+        var cachedData = await module.exports.getResponse(subredditName, mode, timespan, page);
+        if (cachedData && clampedIndex < cachedData.children.length)
+            return cachedData.children[clampedIndex].data;
+    }
 
-        if (useCache) {
-            var cachedData = await module.exports.getResponse(subredditName, mode, timespan, page);
-            if (cachedData && clampedIndex < cachedData.children.length)
-                return cachedData.children[clampedIndex].data;
-        }
-
-        var after = null;
-        if (page > 0) {
-            after = await rgetAsync(
-                module.exports.getFullSubredditPageKey(
-                    subredditName,
-                    mode,
-                    timespan,
-                    page - 1,
-                    "after"
-                )
-            );
-            if (!after) {
-                console.warn(
-                    "[redis-cache] (warning) getCachedRedditItem: could not get 'after', probably end of feed"
-                );
-                return null;
-            }
-        }
-
-        const url = `https://api.reddit.com/r/${subredditName}/${mode}?limit=${module.exports.cachePerPages}&after=${after}&t=${timespan}`;
-        if (debug) console.log("[redis-cache] (debug) getcachedRedditItem:", url);
-
-        var response = await ax.get(url);
-        var data = Array.isArray(response.data) ? response.data[0].data : response.data.data;
-        if (data.children.length <= 0 || !data.children[0].data.subreddit)
-            throw new Error("Reddit did not respond with any posts.");
-
-        module.exports.cacheResponse(subredditName, data, mode, timespan, page);
-
-        //fs.writeFileSync("./cache/lastresponse.json", JSON.stringify(data, null, 2));
-
-        if (data && clampedIndex < data.children.length) {
-            return data.children[clampedIndex].data;
-        } else {
+    var after = null;
+    if (page > 0) {
+        after = await rgetAsync(
+            module.exports.getFullSubredditPageKey(subredditName, mode, timespan, page - 1, "after")
+        );
+        if (!after) {
             console.warn(
-                "[redis-cache] (warning) getCachedRedditItem: returning null, the response did not contains enough items."
+                "[redis-cache] (warning) getCachedRedditItem: could not get 'after', probably end of feed"
             );
             return null;
         }
-    } catch (ex) {
-        console.error(
-            "[redis-cache] (error) getCachedRedditItem: could not get subreddit items:",
-            ex.message
+    }
+
+    const url = `https://api.reddit.com/r/${subredditName}/${mode}?limit=${module.exports.cachePerPages}&after=${after}&t=${timespan}`;
+    if (debug) console.log("[redis-cache] (debug) getcachedRedditItem:", url);
+
+    var response = await ax.get(url);
+    var data = Array.isArray(response.data) ? response.data[0].data : response.data.data;
+    if (data.children.length <= 0 || !data.children[0].data.subreddit)
+        throw new Error(
+            `Reddit did not respond with any posts. Misspelled ***${subredditName}***?`
         );
-        throw ex;
+
+    module.exports.cacheResponse(subredditName, data, mode, timespan, page);
+
+    //fs.writeFileSync("./cache/lastresponse.json", JSON.stringify(data, null, 2));
+
+    if (data && clampedIndex < data.children.length) {
+        return data.children[clampedIndex].data;
+    } else {
+        console.warn(
+            "[redis-cache] (warning) getCachedRedditItem: returning null, the response did not contains enough items."
+        );
+        return null;
     }
 };
