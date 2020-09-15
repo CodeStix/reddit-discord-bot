@@ -418,10 +418,23 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
     return [redditItem, index];
 }
 
+var redditPostRegex = /^https?:\/\/(?:www\.)?reddit\.com\/(?:r\/(?<subredditName>[\w\d]+)\/)?comments\/(?<postId>[\w\d]+)/i;
 async function processPostMessage(message) {
+    var results = redditPostRegex.exec(message.content);
+    console.log(results);
+    if (!results || !results.groups.postId) {
+        message.channel.send(
+            new MessageEmbed().setTitle("❌ Invalid reddit url.").setColor("#FF4301")
+        );
+        return;
+    }
+
     var redditItem;
     try {
-        redditItem = await redditCache.getRedditPost(userInput[1], userInput[3]);
+        redditItem = await redditCache.getRedditPost(
+            results.groups.subredditName,
+            results.groups.postId
+        );
     } catch (ex) {
         console.error("[reddit-bot] processMessage: could not embed post:", ex);
         message.channel.send(new MessageEmbed().setTitle("❌ " + ex.message).setColor("#FF4301"));
@@ -560,7 +573,7 @@ async function processMessage(message) {
 
     */
 
-    if (message.content.startsWith("https://www.reddit.com/r/")) {
+    if (message.content.startsWith("https://www.reddit.com/")) {
         await processPostMessage(message);
     } else if (message.content.startsWith("r/")) {
         await processPrefixMessage(message);
