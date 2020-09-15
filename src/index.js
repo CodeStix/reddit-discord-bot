@@ -110,10 +110,9 @@ function getFileNameForUrl(url) {
  * @param {TextChannel} channel
  * @param {string} url An url attachment for the reddit item.
  */
-async function sendRedditAttachment(channel, url, isVideo, markSpoiler) {
+async function sendRedditAttachment(channel, url, asVideo, markSpoiler) {
     const fileName = getFileNameForUrl(url);
-
-    if (isVideo) {
+    if (asVideo || isVideoUrl(url)) {
         try {
             var videoFile = await video.getCachedVideoPath(url);
             if (!videoFile) {
@@ -133,13 +132,7 @@ async function sendRedditAttachment(channel, url, isVideo, markSpoiler) {
                 spoiler: true,
             });
         }
-    } else if (
-        url.endsWith(".gif") ||
-        url.endsWith(".png") ||
-        url.endsWith(".jpg") ||
-        url.startsWith("https://i.redd.it/") ||
-        url.startsWith("https://i.postimg.cc/")
-    ) {
+    } else if (isImageUrl(url)) {
         try {
             const name = markSpoiler ? `SPOILER_${fileName}.png` : `image-${fileName}.png`;
             await channel.send("", new MessageAttachment(url, name));
@@ -206,6 +199,16 @@ function createIndentedComment(header, content, level, spoiler) {
     }
 
     return "> " + indent + header + "\n" + out;
+}
+
+function isImageUrl(url) {
+    return (
+        url.endsWith(".gif") ||
+        url.endsWith(".png") ||
+        url.endsWith(".jpg") ||
+        url.startsWith("https://i.redd.it/") ||
+        url.startsWith("https://i.postimg.cc/")
+    );
 }
 
 function isVideoUrl(url) {
@@ -311,12 +314,7 @@ async function sendRedditItem(channel, redditItem) {
     if (fullLink != redditItem.url) {
         redditItem.url = await unpackUrl(redditItem.url);
 
-        sendRedditAttachment(
-            channel,
-            redditItem.url,
-            redditItem.is_video || isVideoUrl(redditItem.url),
-            asSpoiler
-        );
+        sendRedditAttachment(channel, redditItem.url, redditItem.is_video, asSpoiler);
     } else {
         // The embedded link is the same as the reddit url, so do not send the link
         // console.log("[reddit-bot] sendRedditItem: stale reddit post, not sending attachment", fullLink);
