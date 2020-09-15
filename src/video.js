@@ -64,25 +64,45 @@ module.exports.getVideoInfo = async function (inputPath) {
     }
 };
 
-module.exports.getPathForVideo = function (videoUrl, maxVideoSize) {
+module.exports.getPathForVideoUrl = function (videoUrl, maxVideoSize = 1000 * 1000 * 8) {
     const videoUrlHash = crypto.createHash("sha1").update(videoUrl, "binary").digest("hex");
     const videoFileName = videoUrlHash + "-" + maxVideoSize + ".mp4";
     return path.join(__dirname, "cache/videos/" + videoFileName);
 };
 
-var videoWaiters = {};
+module.exports.getCachedVideoPath = async function (videoUrl, maxVideoFileSize = 1000 * 1000 * 8) {
+    const videoFile = module.exports.getPathForVideoUrl(videoUrl, maxVideoFileSize);
+    return (await existsAsync(videoFile)) ? videoFile : null;
+};
 
 module.exports.getCachedVideo = async function (
     videoUrl,
     maxVideoFileSize = 1000 * 1000 * 8,
     doNotDownload = false
 ) {
-    if (!(videoUrl in videoWaiters)) {
-        videoWaiters[videoUrl] = module.exports.getCachedVideoTask(
-            videoUrl,
-            maxVideoFileSize,
-            doNotDownload
+    const videoFile = await module.exports.getCachedVideoPath(videoUrl, maxVideoFileSize);
+    if (videoFile) {
+        // The video is already downloaded
+        if (debug) console.log("[video] (debug) getCachedVideo: already downloaded:", videoFile);
+        return videoFile;
+    }
+
+    if (doNotDownload || module.exports.disableVideoDownload) {
+        console.warn(
+            "[video] (warning) getCachedVideo: not downloading video, video downloading is disabled."
         );
+        throw new Error("Video not available.");
+    }
+
+    return await module.exports.cacheVideo(videoUrl, maxVideoFileSize);
+};
+
+var videoWaiters = {};
+
+module.exports.cacheVideo = async function (videoUrl, maxVideoFileSize = 1000 * 1000 * 8) {
+    // Make sure the same video is not downloaded twice at the same time
+    if (!(videoUrl in videoWaiters)) {
+        videoWaiters[videoUrl] = module.exports.cacheVideoTask(videoUrl, maxVideoFileSize);
     }
 
     try {
@@ -92,19 +112,9 @@ module.exports.getCachedVideo = async function (
     }
 };
 
-module.exports.getCachedVideoTask = async function (
-    videoUrl,
-    maxVideoFileSize = 1000 * 1000 * 8,
-    doNotDownload = false
-) {
-    const videoFile = module.exports.getPathForVideo(videoUrl, maxVideoFileSize);
-
-    if (await existsAsync(videoFile)) {
-        if (debug)
-            console.log("[video] (debug) getCachedVideoTask: already downloaded:", videoFile);
-        return videoFile;
-    }
-    if (doNotDownload || module.exports.disableVideoDownload) return null;
+module.exports.cacheVideoTask = async function (videoUrl, maxVideoFileSize = 1000 * 1000 * 8) {
+    const videoFile = module.exports.getPathForVideoUrl(videoUrl, maxVideoFileSize);
+    if (await existsAsync(videoFile)) return videoFile;
 
     // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
     const tempVideoFile = videoFile + ".temp.mp4";
@@ -167,11 +177,4 @@ module.exports.getCachedVideoTask = async function (
     }
 
     return videoFile;
-    // } catch (ex) {
-    //     console.warn(
-    //         "[video] (error) getCachedVideoTask: could not upload/convert video:",
-    //         ex.message
-    //     );
-    //     return null;
-    // }
 };

@@ -17,6 +17,8 @@ const video = require("./video");
 const redditIcon = "https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-72x72.png";
 const sadRedditIcon =
     "https://cdn.discordapp.com/attachments/711525975636049921/720991277918847047/redditsad.png";
+const videoBufferGif =
+    "https://cdn.discordapp.com/attachments/755133141559017655/755357978840006696/MessySeveralEft-size_restricted.gif";
 
 let enableTopComments = true;
 let skipAtDescriptionLength = 400;
@@ -158,8 +160,15 @@ async function sendRedditAttachment(channel, url, isVideo, markSpoiler) {
 
     if (isVideo) {
         try {
-            const videoFile = await video.getCachedVideo(url);
-            await sendAs(videoFile, "video");
+            var videoFile = await video.getCachedVideoPath(url);
+            if (!videoFile) {
+                var buffering = channel.send(new MessageAttachment(videoBufferGif, "Loading.gif"));
+                videoFile = await video.getCachedVideo(url);
+                (await buffering).delete();
+            }
+
+            const name = markSpoiler ? `SPOILER_${fileName}.mp4` : `video-${fileName}.mp4`;
+            await channel.send("", new MessageAttachment(videoFile, name));
         } catch (ex) {
             console.warn(
                 "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending as url:",
