@@ -157,14 +157,15 @@ async function sendRedditAttachment(channel, url, isVideo, markSpoiler) {
     }
 
     if (isVideo) {
-        const videoFile = await video.getCachedVideo(url);
-        if (videoFile) {
+        try {
+            const videoFile = await video.getCachedVideo(url);
             await sendAs(videoFile, "video");
-        } else {
+        } catch (ex) {
             console.warn(
-                "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending as url"
+                "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending as url:",
+                ex
             );
-            await sendAs(url, "url", "⚠️ **Could not upload video, take a url:** ");
+            await sendAs(url, "url", `⚠️ **${ex.message}** `);
         }
     } else if (
         url.endsWith(".gif") ||

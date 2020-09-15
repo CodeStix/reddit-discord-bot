@@ -85,9 +85,11 @@ module.exports.getCachedVideo = async function (
         );
     }
 
-    var res = await videoWaiters[videoUrl];
-    delete videoWaiters[videoUrl];
-    return res;
+    try {
+        return await videoWaiters[videoUrl];
+    } finally {
+        delete videoWaiters[videoUrl];
+    }
 };
 
 module.exports.getCachedVideoTask = async function (
@@ -95,39 +97,58 @@ module.exports.getCachedVideoTask = async function (
     maxVideoFileSize = 1000 * 1000 * 8,
     doNotDownload = false
 ) {
-    try {
-        const videoFile = module.exports.getPathForVideo(videoUrl, maxVideoFileSize);
+    const videoFile = module.exports.getPathForVideo(videoUrl, maxVideoFileSize);
 
-        if (await existsAsync(videoFile)) return videoFile;
-        if (doNotDownload || module.exports.disableVideoDownload) return null;
-
-        // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
-        const tempVideoFile = videoFile + ".temp.mp4";
-        const youtubeCmd = `youtube-dl -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${module.exports.maxVideoDownloadSize} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFile}" "${videoUrl}"`; // --no-warnings --print-json --no-progress;
+    if (await existsAsync(videoFile)) {
         if (debug)
-            console.log(`[video] (debug) getCachedVideoTask: execute youtube-dl: ${youtubeCmd}`);
+            console.log("[video] (debug) getCachedVideoTask: already downloaded:", videoFile);
+        return videoFile;
+    }
+    if (doNotDownload || module.exports.disableVideoDownload) return null;
+
+    // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
+    const tempVideoFile = videoFile + ".temp.mp4";
+    const youtubeCmd = `youtube-dl -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${module.exports.maxVideoDownloadSize} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFile}" "${videoUrl}"`; // --no-warnings --print-json --no-progress;
+    if (debug) console.log(`[video] (debug) getCachedVideoTask: execute youtube-dl: ${youtubeCmd}`);
+    try {
         await execAsync(youtubeCmd);
+    } catch (ex) {
+        console.error("[video] (error) getCachedVideoTask: youtube-dl failed:", ex);
+        throw new Error("Error while downloading video.");
+    }
 
-        // Will error is file not exists
-        const videoInfo = await module.exports.getVideoInfo(tempVideoFile);
+    var videoInfo;
+    try {
+        videoInfo = await module.exports.getVideoInfo(tempVideoFile);
+    } catch (ex) {
+        console.error("[video] (error) getCachedVideoTask: could not get video info:", videoInfo);
+        throw new Error("Could not get video information.");
+    }
 
-        if (
-            !videoInfo.format.duration ||
-            videoInfo.format.duration > module.exports.maxVideoCompressLength
-        )
-            throw new Error("Invalid duration: " + videoInfo.format.duration);
+    if (
+        !videoInfo.format.duration ||
+        videoInfo.format.duration > module.exports.maxVideoCompressLength
+    ) {
+        console.error(
+            "[video] (error) getCachedVideoTask: video is too long:",
+            videoInfo.format.duration
+        );
+        throw new Error("Video is too long!");
+    }
 
-        // Reencode if too large or if mpegts file (discord does not display these)
-        if (
-            videoInfo.format.size > maxVideoFileSize ||
-            videoInfo.format.format_name.includes("mpegts") ||
-            videoInfo.format.format_name.includes("gif")
-        ) {
-            console.log("[video] getCachedVideoTask: compressing, video format:", videoInfo.format);
-            const targetAudioBitrate = 35000;
-            const targetFramerate = 24;
-            const targetBitrate =
-                (maxVideoFileSize * 8) / (videoInfo.format.duration * 1.4) - targetAudioBitrate;
+    // Reencode if too large or if mpegts file (discord does not display these)
+    if (
+        videoInfo.format.size > maxVideoFileSize ||
+        videoInfo.format.format_name.includes("mpegts") ||
+        videoInfo.format.format_name.includes("gif")
+    ) {
+        console.log("[video] getCachedVideoTask: compressing, video format:", videoInfo.format);
+        const targetAudioBitrate = 35000;
+        const targetFramerate = 24;
+        const targetBitrate =
+            (maxVideoFileSize * 8) / (videoInfo.format.duration * 1.4) - targetAudioBitrate;
+
+        try {
             await module.exports.compressVideo(
                 tempVideoFile,
                 videoFile,
@@ -135,18 +156,22 @@ module.exports.getCachedVideoTask = async function (
                 targetFramerate,
                 targetAudioBitrate
             );
-
-            fs.unlink(tempVideoFile, () => {});
-        } else {
-            await renameAsync(tempVideoFile, videoFile);
+        } catch (ex) {
+            console.error("[video] (error) getCachedVideoTask: could not compress video:", ex);
+            throw new Error("Error while compressing video.");
         }
 
-        return videoFile;
-    } catch (ex) {
-        console.warn(
-            "[video] (error) getCachedVideoTask: could not upload/convert video:",
-            ex.message
-        );
-        return null;
+        fs.unlink(tempVideoFile, () => {});
+    } else {
+        await renameAsync(tempVideoFile, videoFile);
     }
+
+    return videoFile;
+    // } catch (ex) {
+    //     console.warn(
+    //         "[video] (error) getCachedVideoTask: could not upload/convert video:",
+    //         ex.message
+    //     );
+    //     return null;
+    // }
 };
