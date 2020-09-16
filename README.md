@@ -6,12 +6,12 @@ An amazing Discord bot that connects with reddit. Has video downloading support,
 
 The bot uses the `r/` prefix:
 
--   \`r/pics\`: shows a top post from the r/pics subreddit.
--   \`r/pics new\`: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
--   \`r/pics top\`: shows a top post.
--   \`r/pics week\` or \`r/pics top week\`: shows a top post from the last week. You can also use **hour**, **day**, **month**, **year** and **all**.
+-   `r/pics`: shows a top post from the r/pics subreddit.
+-   `r/pics new`: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
+-   `r/pics top`: shows a top post.
+-   `r/pics week` or `r/pics top week`: shows a top post from the last week. You can also use **hour**, **day**, **month**, **year** and **all**.
 
-ℹ️ **Protip:** You can use the \`r//\` shortcut to repeat your previous input.
+ℹ️ **Protip:** You can use the `r//` shortcut to repeat your previous input.
 
 ![bot prefix usage](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditprefix.png)
 
