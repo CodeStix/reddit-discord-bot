@@ -106,52 +106,6 @@ function getFileNameForUrl(url) {
     return url.replace(/[^a-zA-Z0-9]/g, "").substring(0, 16);
 }
 
-/**
- * @param {TextChannel} channel
- * @param {string} url An url attachment for the reddit item.
- */
-async function sendRedditAttachment(channel, url, asVideo, markSpoiler) {
-    const fileName = getFileNameForUrl(url);
-    if (asVideo || isVideoUrl(url)) {
-        try {
-            var videoFile = await video.getCachedVideoPath(url);
-            if (!videoFile) {
-                var buffering = channel.send(new MessageAttachment(videoBufferGif, "Loading.gif"));
-                videoFile = await video.getCachedVideo(url);
-                (await buffering).delete();
-            }
-
-            const name = markSpoiler ? `SPOILER_${fileName}.mp4` : `video-${fileName}.mp4`;
-            await channel.send("", new MessageAttachment(videoFile, name));
-        } catch (ex) {
-            console.warn(
-                "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending url instead:",
-                ex
-            );
-            await channel.send("||" + url + "||", {
-                spoiler: true,
-            });
-        }
-    } else if (isImageUrl(url)) {
-        try {
-            const name = markSpoiler ? `SPOILER_${fileName}.png` : `image-${fileName}.png`;
-            await channel.send("", new MessageAttachment(url, name));
-        } catch (ex) {
-            console.warn(
-                "[reddit-bot] (warning) sendRedditAttachment: could not send image, sending url instead:",
-                ex.message
-            );
-            await channel.send("||" + url + "||", {
-                spoiler: true,
-            });
-        }
-    } else {
-        await channel.send("||" + url + "||", {
-            spoiler: true,
-        });
-    }
-}
-
 async function getTopComment(redditItem, maxDepth = 2) {
     try {
         const response = await ax.get(
@@ -240,13 +194,13 @@ async function sendRedditItem(channel, redditItem) {
     redditItem.title = redditItem.title || "[deleted]";
     redditItem.url = encodeURI(redditItem.url); // encode weird characters
 
-    const fullLink = encodeURI("https://www.reddit.com" + redditItem.permalink);
+    const postUrl = encodeURI("https://www.reddit.com" + redditItem.permalink);
     const asSpoiler =
         redditItem.spoiler || redditItem.over_18 || redditItem.title.toLowerCase().includes("nsf");
 
     const messageEmbed = new MessageEmbed()
         .setTitle(redditItem.title)
-        .setURL(fullLink)
+        .setURL(postUrl)
         .setAuthor(
             redditItem.author,
             await redditCache.getUserIcon(redditItem.author, true),
@@ -259,65 +213,108 @@ async function sendRedditItem(channel, redditItem) {
             "On r/" + redditItem.subreddit,
             await redditCache.getSubredditIcon(redditItem.subreddit, true)
         );
-    const message = await channel.send(messageEmbed);
 
-    if (enableVotingReactions) message.react("⬆️").then(message.react("⬇️"));
+    const messageTask = channel.send(messageEmbed);
+    if (enableVotingReactions) {
+        messageTask.then((m) => m.react("⬆️").then(m.react("⬇️")));
+    }
 
     const redditIconTask = redditCache.getSubredditIcon(redditItem.subreddit, false);
     const redditCommentsTask = enableTopComments ? getTopComment(redditItem) : undefined;
     const userIconTask = redditCache.getUserIcon(redditItem.author, false);
-    Promise.all([redditIconTask, redditCommentsTask, userIconTask]).then(
-        ([redditIcon, topComment, userIcon]) => {
-            if (enableTopComments) {
-                //  && topComment.score >= 0.06 * redditItem.score
-                var currentComment = topComment;
-                var level = 0;
-                messageEmbed.description += "\n";
-                while (currentComment && currentComment.body) {
-                    var body = currentComment.body.replace(/\n/g, "");
-                    if (body.length > truncateAtCommentLength)
-                        body = body.slice(0, truncateAtCommentLength) + "...";
+    const urlTask = postUrl !== redditItem.url ? unpackUrl(redditItem.url) : undefined;
 
-                    messageEmbed.description += createIndentedComment(
-                        `**${numberToEmoijNumber(currentComment.score, true)}** __${
-                            currentComment.author
-                        }__`,
-                        body,
-                        level++,
-                        false
-                    );
+    const [redditIcon, topComment, userIcon, url] = await Promise.all([
+        redditIconTask,
+        redditCommentsTask,
+        userIconTask,
+        urlTask,
+    ]);
 
-                    if (
-                        currentComment.replies &&
-                        topComment.replies.data &&
-                        topComment.replies.data.children.length > 0
-                    )
-                        currentComment = currentComment.replies.data.children[0].data;
-                    else currentComment = null;
+    if (enableTopComments) {
+        //  && topComment.score >= 0.06 * redditItem.score
+        var currentComment = topComment;
+        var level = 0;
+        messageEmbed.description += "\n";
+        while (currentComment && currentComment.body) {
+            var body = currentComment.body.replace(/\n/g, "");
+            if (body.length > truncateAtCommentLength)
+                body = body.slice(0, truncateAtCommentLength) + "...";
+
+            messageEmbed.description += createIndentedComment(
+                `**${numberToEmoijNumber(currentComment.score, true)}** __${
+                    currentComment.author
+                }__`,
+                body,
+                level++,
+                false
+            );
+
+            if (
+                currentComment.replies &&
+                topComment.replies.data &&
+                topComment.replies.data.children.length > 0
+            )
+                currentComment = currentComment.replies.data.children[0].data;
+            else currentComment = null;
+        }
+    }
+
+    if (redditIcon) {
+        messageEmbed.setFooter("On r/" + redditItem.subreddit, redditIcon);
+    }
+
+    if (userIcon) {
+        messageEmbed.setAuthor(
+            redditItem.author,
+            userIcon,
+            "https://reddit.com/u/" + redditItem.author
+        );
+    }
+
+    var sendAsVideo = false;
+    if (url) {
+        const fileName = getFileNameForUrl(url);
+        if (isImageUrl(url)) {
+            if (asSpoiler) {
+                channel.send("", new MessageAttachment(url, `SPOILER_${fileName}.png`));
+            } else {
+                messageEmbed.setImage(url);
+            }
+        } else if (redditItem.is_video || isVideoUrl(url)) {
+            sendAsVideo = true;
+        } else {
+            if (asSpoiler) {
+                messageEmbed.description += `\n||${url}||`;
+            } else {
+                messageEmbed.description += `\n**${url}**`;
+            }
+        }
+    }
+
+    (await messageTask).edit(messageEmbed);
+
+    if (sendAsVideo) {
+        try {
+            var videoFile = await video.getCachedVideoPath(url);
+            if (!videoFile) {
+                var buffering = channel.send(new MessageAttachment(videoBufferGif, "Loading.gif"));
+                try {
+                    videoFile = await video.getCachedVideo(url);
+                } finally {
+                    (await buffering).delete();
                 }
             }
-            if (redditIcon) {
-                messageEmbed.setFooter("On r/" + redditItem.subreddit, redditIcon);
-            }
-            if (userIcon) {
-                messageEmbed.setAuthor(
-                    redditItem.author,
-                    userIcon,
-                    "https://reddit.com/u/" + redditItem.author
-                );
-            }
-            message.edit(messageEmbed);
+            const fileName = getFileNameForUrl(url);
+            const name = asSpoiler ? `SPOILER_${fileName}.mp4` : `video-${fileName}.mp4`;
+            await channel.send("", new MessageAttachment(videoFile, name));
+        } catch (ex) {
+            console.warn(
+                "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending url instead:",
+                ex
+            );
+            await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
         }
-    );
-
-    // console.log(fullLink, redditItem.url);
-    if (fullLink != redditItem.url) {
-        redditItem.url = await unpackUrl(redditItem.url);
-
-        sendRedditAttachment(channel, redditItem.url, redditItem.is_video, asSpoiler);
-    } else {
-        // The embedded link is the same as the reddit url, so do not send the link
-        // console.log("[reddit-bot] sendRedditItem: stale reddit post, not sending attachment", fullLink);
     }
 }
 
@@ -389,7 +386,10 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
                 )
                     return;
                 futureRedditItem.url = await unpackUrl(futureRedditItem.url);
-                if (futureRedditItem.is_video || isVideoUrl(futureRedditItem.url)) {
+                if (
+                    futureRedditItem.url &&
+                    (futureRedditItem.is_video || isVideoUrl(futureRedditItem.url))
+                ) {
                     const cachedVideoPath = await video.getCachedVideo(futureRedditItem.url); // Will cache video
                     if (cachedVideoPath)
                         console.log(
@@ -563,7 +563,6 @@ async function processMessage(message) {
     /*
         r/              shows help
         r/help          shows help
-        r/
         
         r//             send another post from previously entered subreddit
         r/test          shows a post from the test subreddit
