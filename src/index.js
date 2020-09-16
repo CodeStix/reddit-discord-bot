@@ -439,7 +439,9 @@ async function processPostMessage(message) {
         );
     } catch (ex) {
         console.error("[reddit-bot] processMessage: could not embed post:", ex);
-        message.channel.send(new MessageEmbed().setTitle("❌ " + ex.message).setColor("#FF4301"));
+        await message.channel.send(
+            new MessageEmbed().setTitle("❌ " + ex.message).setColor("#FF4301")
+        );
         return;
     }
 
@@ -466,7 +468,7 @@ async function processPrefixMessage(message) {
 
          [More information here](https://github.com/CodeStix/reddit-discord-bot)
         `;
-        message.reply(
+        await message.reply(
             new MessageEmbed()
                 .setTitle("Reddit Bot Help")
                 .setDescription(description)
@@ -475,13 +477,13 @@ async function processPrefixMessage(message) {
         return;
     } else if (input.startsWith("/")) {
         if (input.length > 1) {
-            message.reply(
+            await message.reply(
                 "⚠️ **r//** just reuses your previous input, do not type anything after it. Use **r/help** to show instructions."
             );
         }
         input = await redditCache.getPreviousUserInput(message.channel.id, message.author.id);
         if (!input) {
-            message.reply(
+            await message.reply(
                 "😬 I'm sorry, I don't remember your previous input, please type it once again."
             );
             return;
@@ -527,7 +529,9 @@ async function processPrefixMessage(message) {
             "[reddit-bot] (error) processMessage: getMatchingRedditItem() threw error:",
             ex
         );
-        message.channel.send(new MessageEmbed().setTitle("❌ " + ex.message).setColor("#FF4301"));
+        await message.channel.send(
+            new MessageEmbed().setTitle("❌ " + ex.message).setColor("#FF4301")
+        );
         return;
     }
 
@@ -541,7 +545,7 @@ async function processPrefixMessage(message) {
     await redditCache.setPreviousUserInput(message.channel.id, message.author.id, input);
 
     if (index === 0 && redditItem == null) {
-        message.channel.send(
+        await message.channel.send(
             new MessageEmbed()
                 .setTitle("⚠️ End of feed!")
                 .setDescription(
@@ -553,8 +557,10 @@ async function processPrefixMessage(message) {
         return;
     }
 
-    sendRedditItem(message.channel, redditItem);
+    await sendRedditItem(message.channel, redditItem);
 }
+
+var processingChannels = {};
 
 /**
  * @param {Message} message
@@ -575,9 +581,15 @@ async function processMessage(message) {
     */
 
     if (message.content.startsWith("https://www.reddit.com/")) {
+        if (processingChannels[message.channel.id]) return;
+        processingChannels[message.channel.id] = true;
         await processPostMessage(message);
+        delete processingChannels[message.channel.id];
     } else if (message.content.startsWith("r/")) {
+        if (processingChannels[message.channel.id]) return;
+        processingChannels[message.channel.id] = true;
         await processPrefixMessage(message);
+        delete processingChannels[message.channel.id];
     }
 }
 
