@@ -272,48 +272,50 @@ async function sendRedditItem(channel, redditItem) {
         );
     }
 
-    var sendAsVideo = false;
-    if (url) {
-        const fileName = getFileNameForUrl(url);
-        if (isImageUrl(url)) {
-            if (asSpoiler) {
-                channel.send("", new MessageAttachment(url, `SPOILER_${fileName}.png`));
-            } else {
-                messageEmbed.setImage(url);
-            }
-        } else if (redditItem.is_video || isVideoUrl(url)) {
-            sendAsVideo = true;
-        } else {
-            if (asSpoiler) {
-                messageEmbed.description += `\n||${url}||`;
-            } else {
-                messageEmbed.description += `\n**${url}**`;
-            }
-        }
-    }
-
     (await messageTask).edit(messageEmbed);
 
-    if (sendAsVideo) {
-        try {
-            var videoFile = await video.getCachedVideoPath(url);
-            if (!videoFile) {
-                var buffering = channel.send(new MessageAttachment(videoBufferGif, "Loading.gif"));
-                try {
-                    videoFile = await video.getCachedVideo(url);
-                } finally {
-                    (await buffering).delete();
+    if (url) {
+        const fileName = getFileNameForUrl(url);
+
+        if (redditItem.is_video || isVideoUrl(url)) {
+            try {
+                var videoFile = await video.getCachedVideoPath(url);
+                if (!videoFile) {
+                    var buffering = channel.send(
+                        new MessageAttachment(videoBufferGif, "Loading.gif")
+                    );
+                    try {
+                        videoFile = await video.getCachedVideo(url);
+                    } finally {
+                        (await buffering).delete();
+                    }
                 }
+                const name = asSpoiler ? `SPOILER_${fileName}.mp4` : `video-${fileName}.mp4`;
+                await channel.send("", new MessageAttachment(videoFile, name));
+            } catch (ex) {
+                console.warn(
+                    "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending url instead:",
+                    ex
+                );
+                await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
             }
-            const fileName = getFileNameForUrl(url);
-            const name = asSpoiler ? `SPOILER_${fileName}.mp4` : `video-${fileName}.mp4`;
-            await channel.send("", new MessageAttachment(videoFile, name));
-        } catch (ex) {
-            console.warn(
-                "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending url instead:",
-                ex
-            );
-            await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
+        } else if (isImageUrl(url)) {
+            try {
+                const name = asSpoiler ? `SPOILER_${fileName}.png` : `image-${fileName}.png`;
+                channel.send("", new MessageAttachment(url, name));
+            } catch (ex) {
+                console.warn(
+                    "[reddit-bot] (warning) sendRedditAttachment: could not send as image, sending url instead:",
+                    ex
+                );
+                await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
+            }
+        } else {
+            if (asSpoiler) {
+                await channel.send(`||${url}||`);
+            } else {
+                await channel.send(url);
+            }
         }
     }
 }
