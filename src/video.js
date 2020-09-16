@@ -117,10 +117,12 @@ module.exports.cacheVideoTask = async function (videoUrl, maxVideoFileSize = 100
     if (await existsAsync(videoFile)) return videoFile;
 
     // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
+    // -4 flag: https://github.com/ytdl-org/youtube-dl/issues/19269
     const tempVideoFile = videoFile + ".temp.mp4";
-    const youtubeCmd = `youtube-dl -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${module.exports.maxVideoDownloadSize} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFile}" "${videoUrl}"`; // --no-warnings --print-json --no-progress;
+    const youtubeCmd = `youtube-dl -4 -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${module.exports.maxVideoDownloadSize} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFile}" "${videoUrl}"`; // --no-warnings --print-json --no-progress;
     if (debug) console.log(`[video] (debug) getCachedVideoTask: execute youtube-dl: ${youtubeCmd}`);
     try {
+        console.log("youtubecmd", youtubeCmd);
         await execAsync(youtubeCmd);
     } catch (ex) {
         console.error("[video] (error) getCachedVideoTask: youtube-dl failed:", ex);
