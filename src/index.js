@@ -405,7 +405,7 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
             .catch((err) => {
                 console.error(
                     "[reddit-bot] (error) nextRedditItem: could not cache next video:",
-                    err
+                    err.message
                 );
             });
 
