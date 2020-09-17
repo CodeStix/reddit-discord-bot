@@ -1,6 +1,6 @@
 # reddit-discord-bot
 
-An amazing Discord bot that connects with reddit. Has video downloading support, 50/50 spoilers ...
+An amazing Discord bot that connects with reddit. Has video playback support, NSFW (and 50/50) spoilers ...
 
 ## Usage
 
@@ -17,7 +17,7 @@ The bot uses the `r/` prefix:
 
 ## Embedding
 
-You can also past a reddit url into the chat, the bot will transform it into a nice embedded message.
+You can also paste a reddit url into the chat, the bot will transform it into a nice embedded message.
 
 ![reddit url embedding](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditurl.png)
 
