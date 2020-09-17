@@ -27,9 +27,9 @@ This bot is made with nodejs, ffmpeg, youtube-dl and redis.
 
 1. The bot listens for any incoming Discord message and checks if the message's content starts with the `r/` prefix.
 2. Parses input: `r/pics new` => `var subreddit = "pics", mode = "new"`.
-3. Looks in the reddit cache if a post was already requested from this subreddit. If not, request from the reddit api and store it in the cache.
+3. Looks in the redis cache if a post was already requested from this subreddit. If not, request from the reddit api and store it in the cache.
 4. Loop through the reddit response until a post matches the filter.
-5. Store the current subreddit post index in the cache. (so the bot knows where to start looking for the next post)
+5. Store the current subreddit post index in the redis cache. (so the bot knows where to start looking for the next post)
 6. If video, use youtube-dl and ffmpeg to download and convert the video to mp4. If the video is larger than 8MB, compress the video using ffmpeg.
 7. Send the post in an embedded Discord message.
 
