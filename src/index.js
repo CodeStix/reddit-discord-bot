@@ -462,7 +462,7 @@ async function processPrefixMessage(message) {
 
          - \`r/pics top\`: shows a top post.
 
-         - \`r/pics top week\` or \`r/pics week\`: shows a top post from the last week.
+         - \`r/pics top week\` or \`r/pics week\`: shows a top post from the last week. You can also use hour, day, month, year and all.
 
          ℹ️ **Protip: **You can use the \`r//\` shortcut to repeat your previous input.
 
