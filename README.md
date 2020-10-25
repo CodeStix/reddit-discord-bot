@@ -13,6 +13,8 @@ The bot uses the `r/` prefix:
 
 ℹ️ **Protip:** You can use the `r//` shortcut to repeat your previous input.
 
+To enable NSFW reddit content (e.g. r/fiftyfifty), you **MUST** mark the Discord channel as NSFW.
+
 ![bot prefix usage](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditprefix.png)
 
 ## Embedding
