@@ -25,7 +25,6 @@ let skipAtDescriptionLength = 400;
 let truncateAtDescriptionLength = 375; // Max is 1024
 let truncateAtTitleLength = 200; // Max is 256
 let truncateAtCommentLength = 200; // Max is 1024
-let tryRemoveNsfw = false;
 let enableVotingReactions = false;
 let minimumPostVotes = 0;
 let commentSortMode = "top"; // Can be: confidence, top, new, controversial, old, random, qa, live
@@ -195,8 +194,9 @@ async function sendRedditItem(channel, redditItem) {
     redditItem.url = encodeURI(redditItem.url); // encode weird characters
 
     const postUrl = encodeURI("https://www.reddit.com" + redditItem.permalink);
-    const asSpoiler =
-        redditItem.spoiler || redditItem.over_18 || redditItem.title.toLowerCase().includes("nsf");
+
+    const nsfw = redditItem.over_18 || redditItem.title.toLowerCase().includes("nsf");
+    const asSpoiler = redditItem.spoiler || nsfw;
 
     const messageEmbed = new MessageEmbed()
         .setTitle(redditItem.title)
@@ -349,15 +349,15 @@ function numberToEmoijNumber(num, small = false) {
     return out;
 }
 
-function redditItemMatchesFilters(redditItem) {
+function redditItemMatchesFilters(redditItem, allowNsfw) {
     return (
-        (!tryRemoveNsfw || !redditItem.title.toLowerCase().includes("nsf")) &&
+        (allowNsfw || (!redditItem.title.toLowerCase().includes("nsf") && !redditItem.over_18)) &&
         skipAtDescriptionLength > (redditItem.selftext || "").length &&
         minimumPostVotes <= Math.abs(redditItem.score)
     );
 }
 
-async function nextRedditItem(index, subredditName, subredditMode, subredditTopTimespan) {
+async function nextRedditItem(index, subredditName, subredditMode, subredditTopTimespan, allowNsfw) {
     var tries = 0;
     var redditItem = null;
     do {
@@ -384,7 +384,7 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
                 if (
                     !futureRedditItem ||
                     futureRedditItem instanceof Error ||
-                    !redditItemMatchesFilters(futureRedditItem)
+                    !redditItemMatchesFilters(futureRedditItem, allowNsfw)
                 )
                     return;
                 futureRedditItem.url = await unpackUrl(futureRedditItem.url);
@@ -410,12 +410,10 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
             });
 
         if (++tries > 50)
-            throw new Error(
-                `There are no posts from **${subredditName}** available that match your filters. I'm sorry.`
-            );
+            throw new Error(`There are no posts from **${subredditName}** available that match your filters. Enable NSFW on this discord channel to show NSFW content.`);
 
         index++;
-    } while (!redditItemMatchesFilters(redditItem));
+    } while (!redditItemMatchesFilters(redditItem, allowNsfw));
 
     return [redditItem, index];
 }
@@ -449,6 +447,10 @@ async function processPostMessage(message) {
     await sendRedditItem(message.channel, redditItem);
 }
 
+/**
+ * 
+ * @param {Message} message 
+ */
 async function processPrefixMessage(message) {
     var input = message.content.substring(2).toLowerCase().trim();
     console.log(`[reddit-bot] input '${input}'`);
@@ -517,12 +519,14 @@ async function processPrefixMessage(message) {
     );
 
     var redditItem;
+    var newIndex;
     try {
-        [redditItem, index] = await nextRedditItem(
+        [redditItem, newIndex] = await nextRedditItem(
             index,
             subredditName,
             subredditMode,
-            subredditTopTimespan
+            subredditTopTimespan,
+            message.channel.nsfw
         );
     } catch (ex) {
         console.error(
@@ -540,19 +544,25 @@ async function processPrefixMessage(message) {
         subredditMode,
         subredditTopTimespan,
         message.channel.id,
-        index
+        newIndex
     );
     await redditCache.setPreviousUserInput(message.channel.id, message.author.id, input);
 
-    if (index === 0 && redditItem == null) {
-        await message.channel.send(
-            new MessageEmbed()
-                .setTitle("⚠️ End of feed!")
-                .setDescription(
-                    `You reached the end of **r/${subredditName}/${subredditMode}** subreddit, if you request more posts from this subreddit (and filter, ${subredditMode}), you will notice that some will get reposted. Come back later for more recent posts.`
-                )
-                .setColor("#FF4301")
-        );
+    if (newIndex === 0 && redditItem == null) {
+        if (index === 0) {
+            await message.channel.send(new MessageEmbed().setColor("#FF4301").setTitle(`❌ The **${subredditName}** subreddit does not contain any items that match your filters. Enable NSFW on this discord channel to show NSFW content.`));
+        }
+        else {
+            await message.channel.send(
+                new MessageEmbed()
+                    .setTitle("⚠️ End of feed!")
+                    .setDescription(
+                        `You reached the end of **r/${subredditName}/${subredditMode}** subreddit, if you request more posts from this subreddit (and filter, ${subredditMode}), you will notice that some will get reposted. Come back later for more recent posts.`
+                    )
+                    .setColor("#FF4301")
+            );
+        }
+        
 
         return;
     }
