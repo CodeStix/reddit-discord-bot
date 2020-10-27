@@ -1,8 +1,12 @@
 # reddit-discord-bot
 
+An amazing Discord bot that connects with reddit. Has video playback support, NSFW (and 50/50) spoilers ...
+
+![preview](https://i.imgur.com/rvo6bwx.gif)
+
 ### Invite by clicking [here](https://discord.com/oauth2/authorize?client_id=711524405163065385&scope=bot&permissions=326720).
 
-An amazing Discord bot that connects with reddit. Has video playback support, NSFW (and 50/50) spoilers ...
+
 
 ## Usage
 
