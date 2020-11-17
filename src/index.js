@@ -7,12 +7,10 @@ const {
     TextChannel,
 } = require("discord.js");
 const ax = require("./axiosInstance");
-const util = require("util");
-const fs = require("fs");
 const cheerio = require("cheerio");
-const redis = require("redis");
 const redditCache = require("./redisCache");
 const video = require("./video");
+const DBL = require("dblapi.js");
 
 const redditIcon = "https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-72x72.png";
 const sadRedditIcon =
@@ -42,6 +40,18 @@ discordBot.on("error", (err) => {
 discordBot.on("warn", (warning) => {
     console.warn("[reddit-bot] (warning) discord:", warning);
 });
+
+// top.gg api
+const topggToken = process.env.TOPGG_TOKEN;
+if (topggToken) {
+    const dbl = new DBL(topggToken, discordBot);
+    dbl.on("posted", () => {
+        console.log("Server count posted!");
+    });
+    dbl.on("error", e => {
+        console.log(`Top.gg error: ${e}`);
+    });
+}
 
 /**
  * Convert a redirecting, 50/50, bit.ly, imgur... url to the direct url.
