@@ -11,12 +11,15 @@ const cheerio = require("cheerio");
 const redditCache = require("./redisCache");
 const video = require("./video");
 const DBL = require("dblapi.js");
+const debug = require("debug");
+const logger = debug("rdb");
 
 const redditIcon = "https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-72x72.png";
 const sadRedditIcon =
     "https://cdn.discordapp.com/attachments/711525975636049921/720991277918847047/redditsad.png";
 const videoBufferGif =
     "https://cdn.discordapp.com/attachments/755133141559017655/755357978840006696/MessySeveralEft-size_restricted.gif";
+
 
 let enableTopComments = true;
 let skipAtDescriptionLength = 400;
@@ -29,28 +32,33 @@ let commentSortMode = "top"; // Can be: confidence, top, new, controversial, old
 
 const cacheFutureVideoIn = 3; // Cache x videos into the future
 
+
 const discordBot = new DiscordClient();
 discordBot.login(process.env.DISCORD_TOKEN);
 discordBot.on("ready", () => {
-    console.log("[reddit-bot] discord: connected");
+    logger("connected to discord");
 });
 discordBot.on("error", (err) => {
-    console.error("[reddit-bot] (error) discord:", err);
+    logger("discord error:", err);
 });
 discordBot.on("warn", (warning) => {
-    console.warn("[reddit-bot] (warning) discord:", warning);
+    logger("discord warning:", warning);
 });
 
 // top.gg api
 const topggToken = process.env.TOPGG_TOKEN;
+const topggLogger = logger.extend("topgg");
 if (topggToken) {
     const dbl = new DBL(topggToken, discordBot);
     dbl.on("posted", () => {
-        console.log("Server count posted!");
+        topggLogger("Server count posted!");
     });
     dbl.on("error", e => {
-        console.log(`Top.gg error: ${e}`);
+        topggLogger(`Error: ${e}`);
     });
+}
+else {
+    topggLogger("not connecting to top.gg api, no token was provided")
 }
 
 /**
@@ -67,8 +75,8 @@ async function unpackUrl(url) {
         try {
             url = (await ax.head(url, { maxRedirects: 5 })).request.res.responseUrl;
         } catch (ex) {
-            console.warn(
-                "[reddit-bot] (warning) unpackUrl: could not get redirected url",
+            logger(
+                "(warning) unpackUrl: could not get redirected url",
                 ex.message
             );
         }
@@ -100,10 +108,10 @@ async function unpackUrl(url) {
                 if (elem) url = elem.attr("content");
             }
 
-            console.log("[reddit-bot] unpackUrl: extracted imgur/postimg url", url);
+            logger("unpackUrl: extracted imgur/postimg url", url);
         } catch (ex) {
-            console.warn(
-                "[reddit-bot] (warning) unpackUrl: could not extract imgur/postimg image",
+            logger(
+                "(warning) unpackUrl: could not extract imgur/postimg image",
                 ex
             );
         }
@@ -133,8 +141,8 @@ async function getTopComment(redditItem, maxDepth = 2) {
         if (!topComment) return;
         return topComment.data;
     } catch (ex) {
-        console.warn(
-            "[reddit-bot] (warning) getTopComment: could not get top comment:",
+        logger(
+            "(warning) getTopComment: could not get top comment:",
             ex.message
         );
         return null;
@@ -303,8 +311,8 @@ async function sendRedditItem(channel, redditItem) {
                 const name = asSpoiler ? `SPOILER_${fileName}.mp4` : `video-${fileName}.mp4`;
                 await channel.send("", new MessageAttachment(videoFile, name));
             } catch (ex) {
-                console.warn(
-                    "[reddit-bot] (warning) sendRedditAttachment: could not send as video, sending url instead:",
+                logger(
+                    "(warning) sendRedditAttachment: could not send as video, sending url instead:",
                     ex
                 );
                 await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
@@ -314,8 +322,8 @@ async function sendRedditItem(channel, redditItem) {
                 const name = asSpoiler ? `SPOILER_${fileName}.png` : `image-${fileName}.png`;
                 channel.send("", new MessageAttachment(url, name));
             } catch (ex) {
-                console.warn(
-                    "[reddit-bot] (warning) sendRedditAttachment: could not send as image, sending url instead:",
+                logger(
+                    "(warning) sendRedditAttachment: could not send as image, sending url instead:",
                     ex
                 );
                 await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
@@ -404,8 +412,8 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
                 ) {
                     const cachedVideoPath = await video.getCachedVideo(futureRedditItem.url); // Will cache video
                     if (cachedVideoPath)
-                        console.log(
-                            "[reddit-bot] nextRedditItem: cached future video",
+                    logger(
+                            "nextRedditItem: cached future video",
                             futureRedditItem.url,
                             "->",
                             cachedVideoPath
@@ -413,8 +421,8 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
                 }
             })
             .catch((err) => {
-                console.error(
-                    "[reddit-bot] (error) nextRedditItem: could not cache next video:",
+                logger(
+                    "(error) nextRedditItem: could not cache next video:",
                     err.message
                 );
             });
@@ -431,7 +439,6 @@ async function nextRedditItem(index, subredditName, subredditMode, subredditTopT
 var redditPostRegex = /^https?:\/\/(?:www\.)?reddit\.com\/(?:r\/(?<subredditName>[\w\d]+)\/)?comments\/(?<postId>[\w\d]+)/i;
 async function processPostMessage(message) {
     var results = redditPostRegex.exec(message.content);
-    console.log(results);
     if (!results || !results.groups.postId) {
         message.channel.send(
             new MessageEmbed().setTitle("❌ Invalid reddit url.").setColor("#FF4301")
@@ -446,7 +453,7 @@ async function processPostMessage(message) {
             results.groups.postId
         );
     } catch (ex) {
-        console.error("[reddit-bot] processMessage: could not embed post:", ex);
+        logger("processMessage: could not embed post:", ex);
         await message.channel.send(
             new MessageEmbed().setTitle("❌ " + ex.message).setColor("#FF4301")
         );
@@ -463,9 +470,11 @@ async function processPostMessage(message) {
  */
 async function processPrefixMessage(message) {
     var input = message.content.substring(2).toLowerCase().trim();
-    console.log(`[reddit-bot] input '${input}'`);
+
     if (input === "" || input === "help" || input === "?") {
         const description = `
+        ${message.channel.nsfw ? "" : "⚠️ **You should mark this channel as NSFW to make sure you can receive all reddit content.**"}
+        
         **You can use the \`r/\` prefix in the following ways:**
 
          - \`r/pics\`: shows a top post from the r/pics subreddit.
@@ -477,8 +486,9 @@ async function processPrefixMessage(message) {
          - \`r/pics top week\` or \`r/pics week\`: shows a top post from the last week. You can also use **hour**, **day**, **month**, **year** and **all**.
 
          ℹ️ **Protip: **You can use the \`r//\` shortcut to repeat your previous input.
+         You can also paste a reddit url, I will convert it into a nice styled message.
 
-         [More information here](https://github.com/CodeStix/reddit-discord-bot)
+         [More information here](https://codestix.nl/article/reddit-discord-bot)
         `;
         await message.reply(
             new MessageEmbed()
@@ -502,6 +512,8 @@ async function processPrefixMessage(message) {
         }
     }
 
+    logger(`input '${input}'`);
+
     var splitted = input.split(/ |\//g);
     var subredditName = splitted[0],
         subredditMode = "top",
@@ -518,8 +530,6 @@ async function processPrefixMessage(message) {
     if (splitted[2]) {
         subredditTopTimespan = splitted[2];
     }
-
-    console.log("[reddit-bot] (debug)", subredditName, subredditMode, subredditTopTimespan);
 
     var index = await redditCache.getChannelSubredditIndex(
         subredditName,
@@ -539,8 +549,8 @@ async function processPrefixMessage(message) {
             message.channel.nsfw
         );
     } catch (ex) {
-        console.error(
-            "[reddit-bot] (error) processMessage: getMatchingRedditItem() threw error:",
+        logger(
+            "(error) processMessage: getMatchingRedditItem() threw error:",
             ex
         );
         await message.channel.send(
@@ -605,7 +615,7 @@ async function processMessage(message) {
         processingChannels[message.channel.id] = true;
         await processPostMessage(message);
         delete processingChannels[message.channel.id];
-    } else if (message.content.startsWith("r/")) {
+    } else if (message.content.startsWith("b/")) {
         if (processingChannels[message.channel.id]) return;
         processingChannels[message.channel.id] = true;
         await processPrefixMessage(message);

@@ -2,7 +2,8 @@ require("dotenv").config();
 const redis = require("redis");
 const util = require("util");
 const ax = require("./axiosInstance");
-const fs = require("fs");
+const debug = require("debug");
+const logger = debug("rdb:redis");
 
 var redisClient = new redis.RedisClient({
     port: process.env.REDIS_PORT,
@@ -15,8 +16,6 @@ var redisClient = new redis.RedisClient({
 const rkeysAsync = util.promisify(redisClient.keys).bind(redisClient);
 const rgetAsync = util.promisify(redisClient.get).bind(redisClient);
 const rsetexAsync = util.promisify(redisClient.setex).bind(redisClient);
-
-const debug = false;
 
 module.exports.cachePerPages = 30;
 module.exports.cacheRedditResponseTtl = 60 * 60 * 8;
@@ -202,8 +201,8 @@ module.exports.getUserIcon = async function (user, fast = false) {
             try {
                 response = await ax.get(`https://api.reddit.com/user/${user}/about`);
             } catch (ex) {
-                console.warn(
-                    "[redis-cache] (warning) getUserIcon: could not get user icon:",
+                logger(
+                    "(warning) getUserIcon: could not get user icon:",
                     ex.message
                 );
                 return module.exports.getRandomDefaultUserIcon();
@@ -226,8 +225,8 @@ module.exports.getSubredditIcon = async function (subredditName, fast = false) {
             try {
                 response = await ax.get(`https://api.reddit.com/r/${subredditName}/about`);
             } catch (ex) {
-                console.warn(
-                    "[redis-cache] (warning) getSubredditIcon: could not get subreddit icon:",
+                logger(
+                    "(warning) getSubredditIcon: could not get subreddit icon:",
                     ex.message
                 );
                 return "";
@@ -315,16 +314,14 @@ module.exports.getCachedRedditItem = async function (
             module.exports.getFullSubredditPageKey(subredditName, mode, timespan, page - 1, "after")
         );
         if (!after) {
-            console.warn(
-                "[redis-cache] (warning) getCachedRedditItem: could not get 'after', probably end of feed"
+            logger(
+                "(warning) getCachedRedditItem: could not get 'after', probably end of feed"
             );
             return null;
         }
     }
 
     const url = `https://api.reddit.com/r/${subredditName}/${mode}?limit=${module.exports.cachePerPages}&after=${after}&t=${timespan}`;
-    if (debug) console.log("[redis-cache] (debug) getcachedRedditItem:", url);
-
     var response = await ax.get(url);
     var data = Array.isArray(response.data) ? response.data[0].data : response.data.data;
     if (data.children.length <= 0 || !data.children[0].data.subreddit)
@@ -339,8 +336,8 @@ module.exports.getCachedRedditItem = async function (
     if (data && clampedIndex < data.children.length) {
         return data.children[clampedIndex].data;
     } else {
-        console.warn(
-            "[redis-cache] (warning) getCachedRedditItem: returning null, the response did not contains enough items."
+        logger(
+            "(warning) getCachedRedditItem: returning null, the response did not contains enough items."
         );
         return null;
     }

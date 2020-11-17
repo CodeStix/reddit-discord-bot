@@ -1,6 +1,5 @@
 const axios = require("axios").default;
 
-
 module.exports = axios.create({
     responseType: "text",
     transformResponse: function (data)
