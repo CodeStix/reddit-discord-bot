@@ -20,9 +20,9 @@ const rsetexAsync = util.promisify(redisClient.setex).bind(redisClient);
 module.exports.cachePerPages = 30;
 module.exports.cacheRedditResponseTtl = 60 * 60 * 8;
 module.exports.cacheNotTopIndexTtl = 60 * 60 * 16;
-module.exports.cacheSubredditIconTtl = 60 * 60 * 24 * 16; // remember the subreddit icon for x seconds
-module.exports.cacheUserIconTtl = 60 * 60 * 24 * 4; // remember the user icon for x seconds
-module.exports.cachePreviousUserInputTtl = 60 * 60 * 28; // remember the user's previous subreddit for x seconds
+module.exports.cacheSubredditIconTtl = 60 * 60 * 24 * 30; // remember the subreddit icon for x seconds
+module.exports.cacheUserIconTtl = 60 * 60 * 24 * 15; // remember the user icon for x seconds
+module.exports.cachePreviousUserInputTtl = 60 * 60 * 24 * 30; // remember the user's previous subreddit for x seconds
 
 module.exports.getFullSubredditChannelKey = function (
     subredditName,
