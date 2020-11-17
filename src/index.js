@@ -20,7 +20,7 @@ const sadRedditIcon =
 const videoBufferGif =
     "https://cdn.discordapp.com/attachments/755133141559017655/755357978840006696/MessySeveralEft-size_restricted.gif";
 
-
+let prefix = "r/";
 let enableTopComments = true;
 let skipAtDescriptionLength = 400;
 let truncateAtDescriptionLength = 375; // Max is 1024
@@ -29,14 +29,13 @@ let truncateAtCommentLength = 200; // Max is 1024
 let enableVotingReactions = false;
 let minimumPostVotes = 0;
 let commentSortMode = "top"; // Can be: confidence, top, new, controversial, old, random, qa, live
-
-const cacheFutureVideoIn = 3; // Cache x videos into the future
-
+let cacheFutureVideoIn = 3; // Cache x videos into the future
 
 const discordBot = new DiscordClient();
 discordBot.login(process.env.DISCORD_TOKEN);
 discordBot.on("ready", () => {
     logger("connected to discord");
+    discordBot.user.setPresence({status: "online", activity: {type: "LISTENING", name: prefix}})
 });
 discordBot.on("error", (err) => {
     logger("discord error:", err);
@@ -46,10 +45,10 @@ discordBot.on("warn", (warning) => {
 });
 
 // top.gg api
-const topggToken = process.env.TOPGG_TOKEN;
-const topggLogger = logger.extend("topgg");
+let topggToken = process.env.TOPGG_TOKEN;
+let topggLogger = logger.extend("topgg");
 if (topggToken) {
-    const dbl = new DBL(topggToken, discordBot);
+    let dbl = new DBL(topggToken, discordBot);
     dbl.on("posted", () => {
         topggLogger("Server count posted!");
     });
@@ -465,7 +464,6 @@ async function processPostMessage(message) {
 }
 
 /**
- * 
  * @param {Message} message 
  */
 async function processPrefixMessage(message) {
@@ -474,20 +472,22 @@ async function processPrefixMessage(message) {
     if (input === "" || input === "help" || input === "?") {
         const description = `
         ${message.channel.nsfw ? "" : "⚠️ **You should mark this channel as NSFW to make sure you can receive all reddit content.**"}
-        
-        **You can use the \`r/\` prefix in the following ways:**
 
-         - \`r/pics\`: shows a top post from the r/pics subreddit.
+        **You can use the \`${prefix}\` prefix in the following ways:**
 
-         - \`r/pics new\`: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
+         - \`${prefix}pics\`: shows a top post from the r/pics subreddit.
 
-         - \`r/pics top\`: shows a top post.
+         - \`${prefix}pics new\`: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
 
-         - \`r/pics top week\` or \`r/pics week\`: shows a top post from the last week. You can also use **hour**, **day**, **month**, **year** and **all**.
+         - \`${prefix}pics top\`: shows a top post.
 
-         ℹ️ **Protip: **You can use the \`r//\` shortcut to repeat your previous input.
+         - \`${prefix}pics top week\` or \`${prefix}pics week\`: shows a top post from the last week. You can also use **hour**, **day**, **month**, **year** and **all**.
+
+         ℹ️ **Protip: **You can use the \`${prefix}/\` shortcut to repeat your previous input.
          You can also paste a reddit url, I will convert it into a nice styled message.
 
+         ❤️ Thanks for using this bot! If you like it, you should consider [voting](https://top.gg/bot/711524405163065385).
+         
          [More information here](https://codestix.nl/article/reddit-discord-bot)
         `;
         await message.reply(
@@ -500,7 +500,7 @@ async function processPrefixMessage(message) {
     } else if (input.startsWith("/")) {
         if (input.length > 1) {
             await message.reply(
-                "⚠️ **r//** just reuses your previous input, do not type anything after it. Use **r/help** to show instructions."
+                `⚠️ **${prefix}/** just reuses your previous input, do not type anything after it. Use **${prefix}help** to show instructions.`
             );
         }
         input = await redditCache.getPreviousUserInput(message.channel.id, message.author.id);
@@ -615,7 +615,7 @@ async function processMessage(message) {
         processingChannels[message.channel.id] = true;
         await processPostMessage(message);
         delete processingChannels[message.channel.id];
-    } else if (message.content.startsWith("b/")) {
+    } else if (message.content.startsWith(prefix)) {
         if (processingChannels[message.channel.id]) return;
         processingChannels[message.channel.id] = true;
         await processPrefixMessage(message);
