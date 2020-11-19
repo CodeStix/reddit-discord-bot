@@ -41,8 +41,8 @@ export async function getCachedRedditListing(
     return JSON.parse((await getAsync(`r${subreddit}:${subredditMode}:${page}`)) ?? "null");
 }
 
-export async function getCachedRedditUserIcon(userName: string): Promise<RedditUser | null> {
-    return JSON.parse((await getAsync(`u${userName}:icon`)) ?? "null");
+export async function getCachedRedditUserIcon(userName: string): Promise<string | null> {
+    return await getAsync(`u${userName}:icon`);
 }
 
 export async function storeCachedRedditUserIcon(userName: string, icon: string) {

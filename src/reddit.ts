@@ -1,4 +1,9 @@
-import { getCachedRedditListing, storeCachedRedditListing } from "./redis";
+import {
+    getCachedRedditListing,
+    getCachedRedditUserIcon,
+    storeCachedRedditListing,
+    storeCachedRedditUserIcon,
+} from "./redis";
 import { debug } from "debug";
 import fetch from "node-fetch";
 
@@ -67,6 +72,20 @@ export function getRandomDefaultUserIcon() {
     return `https://www.redditstatic.com/avatars/avatar_default_${randomTextureId}_${randomColor}.png`;
 }
 
+const AFTER_FETCH_REPLACE: any = {
+    "&amp;": "&",
+    "&quot;": "'",
+    "&lt;": "<",
+};
+const AFTER_FETCH_REGEX = new RegExp(Object.keys(AFTER_FETCH_REPLACE).join("|"), "gi");
+
+async function fetchJson(url: string): Promise<any> {
+    let res = await fetch(url);
+    let text = await res.text();
+    // Replace html entities
+    return JSON.parse(text.replace(AFTER_FETCH_REGEX, (m) => AFTER_FETCH_REPLACE[m.toLowerCase()]));
+}
+
 export async function fetchSubmissions(
     subreddit: string,
     mode: SubredditMode,
@@ -90,9 +109,7 @@ export async function fetchSubmissions(
             throw new Error(`Invalid mode '${mode}' was passed to fetchSubmissions`);
     }
 
-    let resText = await fetch(url);
-    let res = await resText.json();
-
+    let res = await fetchJson(url);
     if (Array.isArray(res)) {
         // Reddit API sometimes returnes array instead of object
         if (res.length === 0)
@@ -118,8 +135,7 @@ export async function fetchUser(userName: string): Promise<RedditUser> {
     }
 
     let url = `${API_BASE}/user/${userName}/about`;
-    let resText = await fetch(url);
-    let res = await resText.json();
+    let res = await fetchJson(url);
 
     if (!res.data) return getDefaultUser(userName);
 
@@ -151,4 +167,13 @@ export async function getRedditSubmission(
         await storeCachedRedditListing(subreddit, subredditMode, page, listing);
         return listing.children[num].data;
     }
+}
+
+export async function getRedditUserIcon(userName: string): Promise<string> {
+    let userIcon = await getCachedRedditUserIcon(userName);
+    if (userIcon) return userIcon;
+
+    let user = await fetchUser(userName);
+    await storeCachedRedditUserIcon(userName, user.icon_img);
+    return user.icon_img;
 }
