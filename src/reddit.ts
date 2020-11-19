@@ -94,11 +94,43 @@ const AFTER_FETCH_REPLACE: any = {
 };
 const AFTER_FETCH_REGEX = new RegExp(Object.keys(AFTER_FETCH_REPLACE).join("|"), "gi");
 
+export type RedditFetchErrorType = "not-found" | "private" | "banned" | "unknown";
+
+export class RedditFetchError extends Error {
+    public type: RedditFetchErrorType;
+
+    static fromReddit404ErrorData(data?: any) {
+        if (!data) return new RedditFetchError("unknown", "An unknown reddit error has occured.");
+        if (data.reason === "banned")
+            return new RedditFetchError("banned", "This subreddit has been banned by Reddit.");
+        if (data.reason === "private")
+            return new RedditFetchError("private", "This subreddit is private and cannot be accessed by me 😢");
+        throw new RedditFetchError("not-found", "This subreddit does not exist. Misspelled?");
+    }
+
+    constructor(type: RedditFetchErrorType = "unknown", message?: string) {
+        let trueProto = new.target.prototype; // https://stackoverflow.com/questions/55065742/implementing-instanceof-checks-for-custom-typescript-error-instances
+        super(message);
+        Object.setPrototypeOf(this, trueProto);
+        this.name = "RedditFetchError";
+        this.type = type;
+    }
+}
+
 async function fetchJson(url: string): Promise<any> {
     let res = await fetch(url);
     let text = await res.text();
     // Replace html entities
-    return JSON.parse(text.replace(AFTER_FETCH_REGEX, (m) => AFTER_FETCH_REPLACE[m.toLowerCase()]));
+    let obj = JSON.parse(text.replace(AFTER_FETCH_REGEX, (m) => AFTER_FETCH_REPLACE[m.toLowerCase()]));
+    if (res.ok) {
+        return obj;
+    } else if (res.status === 404) {
+        throw RedditFetchError.fromReddit404ErrorData(obj);
+    } else if (res.status === 403) {
+        throw new RedditFetchError("private");
+    } else {
+        throw new RedditFetchError("unknown");
+    }
 }
 
 export async function fetchSubmissions(

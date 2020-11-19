@@ -8,6 +8,7 @@ import {
     getRedditSubmission,
     getRedditUserIcon,
     getSubredditIcon,
+    RedditFetchError,
     Submission,
 } from "./reddit";
 import cheerio from "cheerio";
@@ -42,14 +43,42 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
     let triesRemaining = MAX_FILTER_TRIES;
     let submission;
     do {
-        submission = await getRedditSubmission(subreddit, subredditMode, index++);
+        try {
+            submission = await getRedditSubmission(subreddit, subredditMode, index++);
+        } catch (ex) {
+            if (ex instanceof RedditFetchError) {
+                logger("reddit fetch error (%s): %s", ex.type, ex.message);
+                await channel.send(bot.createErrorEmbed(ex.type, ex.message));
+            } else {
+                logger("unknown error", ex);
+                await channel.send(
+                    bot
+                        .createWarningEmbed(
+                            "Unknown problem",
+                            "Beep boop, the bot has self destructed, hopefully a developer will look at this error message..."
+                        )
+                        .setFooter("This error got automatically submitted to the devs.")
+                );
+            }
+            return;
+        }
+
         if (!submission) {
-            channel.send("No posts available.");
+            await channel.send(
+                bot.createWarningEmbed(
+                    "End of feed",
+                    `You've reached the end of the **r/${subreddit}/${subredditMode}** subreddit. Come back later for new posts, or browse a different subreddit.`
+                )
+            );
             return;
         }
 
         if (--triesRemaining <= 0) {
-            channel.send("No posts match your filters. Enable NSFW?");
+            await channel.send(
+                bot
+                    .createWarningEmbed("No posts match your filters. Try enabling NSFW to show more content.", "")
+                    .setImage("https://github.com/CodeStix/reddit-discord-bot/raw/master/images/enable-nsfw.gif")
+            );
             return;
         }
     } while (!matchesChannelFilters(channel, submission));

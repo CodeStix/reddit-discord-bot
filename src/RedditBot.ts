@@ -1,4 +1,4 @@
-import { Client as DiscordBot, Message, MessageAttachment, TextChannel, User } from "discord.js";
+import { Client as DiscordBot, Message, MessageAttachment, MessageEmbed, TextChannel, User } from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
 import { SubredditMode } from "./reddit";
@@ -111,5 +111,13 @@ export class RedditBot extends EventEmitter {
         } else {
             await channel.send(text);
         }
+    }
+
+    public createErrorEmbed(title: string, message: string): MessageEmbed {
+        return new MessageEmbed().setTitle(`❌ ${title}`).setDescription(message).setColor("#FF4301");
+    }
+
+    public createWarningEmbed(title: string, message: string): MessageEmbed {
+        return new MessageEmbed().setTitle(`⚠️ ${title}`).setDescription(message).setColor("#FF4301");
     }
 }
