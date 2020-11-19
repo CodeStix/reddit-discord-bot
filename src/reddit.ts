@@ -242,3 +242,16 @@ export async function getSubredditIcon(subredditName: string, cacheOnly: boolean
         return null;
     }
 }
+
+export async function fetchSubmission(submissionId: string) {
+    let url = `${API_BASE}/comments/${submissionId}`;
+    let res = await fetchJson(url);
+    if (Array.isArray(res)) {
+        // Reddit API sometimes returnes array instead of object
+        if (res.length === 0) throw new Error(`No submissions were returned.`);
+        return res[0].data.children[0].data as Submission;
+    } else {
+        if (!res.data) throw new Error(`No submissions were returned.`);
+        return res.data.children[0].data as Submission;
+    }
+}

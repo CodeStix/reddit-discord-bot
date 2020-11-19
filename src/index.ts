@@ -4,6 +4,7 @@ import { Client as DiscordBot, MessageEmbed, TextChannel } from "discord.js";
 import { debug } from "debug";
 import { RedditBot, RedditUrlMessageHanlderProps, SubredditMessageHanlderProps } from "./RedditBot";
 import {
+    fetchSubmission,
     getRandomDefaultUserIcon,
     getRedditSubmission,
     getRedditUserIcon,
@@ -48,14 +49,14 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
         } catch (ex) {
             if (ex instanceof RedditFetchError) {
                 logger("reddit fetch error (%s): %s", ex.type, ex.message);
-                await channel.send(bot.createErrorEmbed(ex.type, ex.message));
+                await channel.send(bot.createErrorEmbed("Reddit error", ex.message));
             } else {
                 logger("unknown error", ex);
                 await channel.send(
                     bot
                         .createWarningEmbed(
                             "Unknown problem",
-                            "Beep boop, the bot has self destructed, hopefully a developer will look at this error message..."
+                            "Beep boop, the bot has self destructed, i hope a developer will look at this error message..."
                         )
                         .setFooter("This error got automatically submitted to the devs.")
                 );
@@ -85,6 +86,34 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
 
     await storeChannelIndex(channel.id, subreddit, subredditMode, index);
 
+    await sendRedditSubmission(channel, submission);
+});
+
+bot.on("redditUrl", async (props: RedditUrlMessageHanlderProps) => {
+    logger("redditurl", props.submissionId);
+
+    try {
+        let submission = await fetchSubmission(props.submissionId);
+        await sendRedditSubmission(props.channel, submission);
+    } catch (ex) {
+        if (ex instanceof RedditFetchError) {
+            logger("reddit fetch error (%s): %s", ex.type, ex.message);
+            await props.channel.send(bot.createErrorEmbed("Reddit error", ex.message));
+        } else {
+            logger("unknown error", ex);
+            await props.channel.send(
+                bot
+                    .createWarningEmbed(
+                        "Unknown problem",
+                        "Beep boop, the bot has self destructed, i hope a developer will look at this error message..."
+                    )
+                    .setFooter("This error got automatically submitted to the devs.")
+            );
+        }
+    }
+});
+
+async function sendRedditSubmission(channel: TextChannel, submission: Submission) {
     let nsfw = submission.over_18 || submission.title.toLowerCase().includes("nsf");
     let asSpoiler = submission.spoiler || nsfw;
     let urlToSubmission = encodeURI("https://www.reddit.com" + submission.permalink);
@@ -140,11 +169,7 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
             bot.sendUrlAttachment(channel, cachedAttachment, asSpoiler);
         }
     }
-});
-
-bot.on("redditUrl", (props: RedditUrlMessageHanlderProps) => {
-    logger("redditurl", props.submissionId);
-});
+}
 
 async function getUnpackedUrl(url: string, cacheOnly: boolean = false): Promise<string | null> {
     let unpacked = await getCachedPackedUrl(url);
