@@ -19,9 +19,13 @@ export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day"
 export interface Submission {
     author: string;
     selftext: string;
+    created: number;
     title: string;
     url: string;
     subreddit: string;
+    over_18: boolean;
+    spoiler: boolean;
+    permalink: string;
 }
 
 export interface RedditUser {
