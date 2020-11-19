@@ -25,6 +25,7 @@ const EXPIRE_SUBMISSIONS = 60 * 60;
 const EXPIRE_USER_ICON = 60 * 60;
 const EXPIRE_SUBREDDIT_ICON = 60 * 60;
 const EXPIRE_URL = 60 * 60;
+const EXPIRE_CHANNEL_INDEX = 60 * 60;
 
 export async function storeCachedRedditListing(
     subreddit: string,
@@ -65,4 +66,12 @@ export async function getCachedPackedUrl(url: string): Promise<string | null> {
 
 export async function storeCachedPackedUrl(url: string, unpackedUrl: string) {
     await setExAsync(`url:${url}`, EXPIRE_URL, unpackedUrl);
+}
+
+export async function getChannelIndex(channelId: string, subreddit: string, subredditMode: string): Promise<number> {
+    return parseInt((await getAsync(`channel:${channelId}:${subreddit}:${subredditMode}:index`)) ?? "0");
+}
+
+export async function storeChannelIndex(channelId: string, subreddit: string, subredditMode: string, index: number) {
+    await setExAsync(`channel:${channelId}:${subreddit}:${subredditMode}:index`, EXPIRE_CHANNEL_INDEX, "" + index);
 }

@@ -1,12 +1,18 @@
 import { config } from "dotenv";
 config(); // must load environment vars before anything else
-import { Client as DiscordBot, MessageEmbed } from "discord.js";
+import { Client as DiscordBot, MessageEmbed, TextChannel } from "discord.js";
 import { debug } from "debug";
 import { RedditBot, RedditUrlMessageHanlderProps, SubredditMessageHanlderProps } from "./RedditBot";
-import { getRandomDefaultUserIcon, getRedditSubmission, getRedditUserIcon, getSubredditIcon } from "./reddit";
+import {
+    getRandomDefaultUserIcon,
+    getRedditSubmission,
+    getRedditUserIcon,
+    getSubredditIcon,
+    Submission,
+} from "./reddit";
 import cheerio from "cheerio";
 import fetch from "node-fetch";
-import { getCachedPackedUrl, storeCachedPackedUrl } from "./redis";
+import { getCachedPackedUrl, getChannelIndex, storeCachedPackedUrl, storeChannelIndex } from "./redis";
 
 const logger = debug("rdb");
 
@@ -15,17 +21,40 @@ const bot = new RedditBot(process.env.DISCORD_TOKEN!);
 const TRUNCATE_TITLE_LENGTH = 200; // Max is 256
 const TRUNCATE_COMMENTS_LENGTH = 1000; // MAX_COMMENTS_LENGTH + MAX_DESCRIPTION_LENGTH is max 2048
 const TRUNCATE_DESCRIPTION_LENGTH = 1000;
-// const SKIP_DESCRIPTION_LENGTH = 400;
+const MAX_FILTER_TRIES = 35;
+const SKIP_DESCRIPTION_LENGTH = 400;
+const SKIP_MIN_POST_VOTES = 0;
+
+function matchesChannelFilters(channel: TextChannel, submission: Submission): boolean {
+    let allowNsfw = channel.nsfw;
+    return (
+        (allowNsfw || (!submission.title.toLowerCase().includes("nsf") && !submission.over_18)) &&
+        SKIP_DESCRIPTION_LENGTH > (submission.selftext ?? "").length &&
+        SKIP_MIN_POST_VOTES <= Math.abs(submission.score)
+    );
+}
 
 bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: SubredditMessageHanlderProps) => {
     logger("redditrequest", subreddit);
 
-    let submission = await getRedditSubmission(subreddit, subredditMode, 5);
+    let index = await getChannelIndex(channel.id, subreddit, subredditMode);
 
-    if (!submission) {
-        channel.send("No posts available.");
-        return;
-    }
+    let triesRemaining = MAX_FILTER_TRIES;
+    let submission;
+    do {
+        submission = await getRedditSubmission(subreddit, subredditMode, index++);
+        if (!submission) {
+            channel.send("No posts available.");
+            return;
+        }
+
+        if (--triesRemaining <= 0) {
+            channel.send("No posts match your filters. Enable NSFW?");
+            return;
+        }
+    } while (!matchesChannelFilters(channel, submission));
+
+    await storeChannelIndex(channel.id, subreddit, subredditMode, index);
 
     let nsfw = submission.over_18 || submission.title.toLowerCase().includes("nsf");
     let asSpoiler = submission.spoiler || nsfw;

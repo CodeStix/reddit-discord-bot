@@ -159,22 +159,26 @@ export async function getRedditSubmission(
     subredditMode: SubredditMode,
     index: number
 ): Promise<Submission | null> {
-    let page = index / CACHE_PER_PAGE;
-    let num = index % CACHE_PER_PAGE;
+    let page = Math.floor(index / CACHE_PER_PAGE);
+    let num = Math.floor(index % CACHE_PER_PAGE);
 
-    let cached = await getCachedRedditListing(subreddit, subredditMode, page);
-    if (cached !== null) {
-        logger("from cache", cached.children.length);
-        return cached.children[num].data;
-    } else {
+    let listing = await getCachedRedditListing(subreddit, subredditMode, page);
+    if (listing === null) {
+        // Listing does not exist in cache, request it and store it in the cache
         let previousListing = null;
         if (page > 0) previousListing = await getCachedRedditListing(subreddit, subredditMode, page - 1);
 
-        let listing = await fetchSubmissions(subreddit, subredditMode, previousListing?.after);
-        logger("storing in cache", listing.children.length);
+        listing = await fetchSubmissions(subreddit, subredditMode, previousListing?.after);
+        logger("caching listing page %d %s/%s (%d items)", page, subreddit, subredditMode, listing.children.length);
         await storeCachedRedditListing(subreddit, subredditMode, page, listing);
-        return listing.children[num].data;
     }
+
+    if (listing.children.length <= num) {
+        logger("index %d is out of range of listing %s/%s", index, subreddit, subredditMode);
+        return null;
+    }
+
+    return listing.children[num].data;
 }
 
 export async function getRedditUserIcon(userName: string, cacheOnly: boolean = false): Promise<string | null> {
