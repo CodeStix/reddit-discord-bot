@@ -9,6 +9,7 @@ const VIDEO_CACHE_PATH = path.join(__dirname, "cache/videos");
 const FFMPEG_CACHE_PATH = path.join(__dirname, "cache/ffmpeg");
 const DEFAULT_VIDEO_SIZE_LIMIT = 1000 * 1000 * 8; // 8mb
 const MAX_VIDEO_COMPRESS_LENGTH = 100;
+const MAX_VIDEO_DOWNLOAD_SIZE = 1000 * 1000 * 100; // 100mb
 
 const execAsync = util.promisify(exec);
 const logger = debug("rdb:video");
@@ -49,7 +50,7 @@ export async function downloadVideo(url: string, path: string, maxVideoFileSize:
     // -4 flag: https://github.com/ytdl-org/youtube-dl/issues/19269
     let tempVideoFile = path + ".temp.mp4";
     let tempVideoFileFormat = path + ".temp.%(ext)s";
-    let youtubeCmd = `youtube-dl -4 -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${maxVideoFileSize} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFileFormat}" "${encodeURI(
+    let youtubeCmd = `youtube-dl -4 -f "[filesize>6M][filesize<=${maxVideoFileSize}]/[filesize>4M][filesize<=6M]/[filesize>2M][filesize<=4M]/[filesize<=2M]/best/bestvideo+bestaudio" --max-filesize ${MAX_VIDEO_DOWNLOAD_SIZE} --recode-video mp4 --no-playlist --retries 3 --output "${tempVideoFileFormat}" "${encodeURI(
         url
     )}"`; // --no-warnings --print-json --no-progress;
     logger(`execute youtube-dl: ${youtubeCmd}`);

@@ -1,9 +1,10 @@
 import { Client as DiscordBot, Message, MessageAttachment, MessageEmbed, TextChannel, User } from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
-import { SubredditMode, SUBREDDIT_MODES } from "./reddit";
+import { RedditFetchError, SubredditMode, SUBREDDIT_MODES } from "./reddit";
 import { getVideoOrDownload } from "./video";
 import crypto from "crypto";
+import { getPreviousInput, storePreviousInput } from "./redis";
 
 const logger = debug("rdb:bot");
 
@@ -67,19 +68,31 @@ export class RedditBot extends EventEmitter {
         `);
     }
 
-    private handleSubredditMessage(message: Message) {
-        let args = message.content
-            .substring(this.prefix.length)
-            .trim()
-            .toLowerCase()
-            .split(/ |,|:|\//g);
-        let subreddit = args[0];
-        if (!subreddit || subreddit === "help" || subreddit === "h" || subreddit === "?") {
+    private async handleSubredditMessage(message: Message) {
+        let raw = message.content.substring(this.prefix.length).trim().toLowerCase();
+
+        if (!raw || raw === "help" || raw === "h" || raw === "?") {
             message.channel.send(this.createHelpEmbed());
             return;
+        } else if (raw === "/") {
+            // Repeat previous input
+            let previous = await getPreviousInput(message.channel.id, message.author.id);
+            if (!previous) {
+                message.channel.send(
+                    this.createWarningEmbed(
+                        "I don't remember",
+                        "I don't remember your previous input, please type it yourself."
+                    )
+                );
+                return;
+            }
+            raw = previous;
         }
 
+        let args = raw.split(/ |,|:|\//g);
+        let subreddit = args[0];
         let subredditMode: SubredditMode = this.defaultMode;
+
         if (args.length > 1) {
             if (!SUBREDDIT_MODES.includes(args[1])) {
                 logger("user entered wrong subreddit mode %s", args[1]);
@@ -96,6 +109,8 @@ export class RedditBot extends EventEmitter {
             }
             subredditMode = args[1] as SubredditMode;
         }
+
+        storePreviousInput(message.channel.id, message.author.id, raw);
 
         let props: SubredditMessageHanlderProps = {
             channel: message.channel as TextChannel,
