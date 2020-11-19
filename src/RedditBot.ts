@@ -1,15 +1,15 @@
 import { Client as DiscordBot, Message, TextChannel, User } from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
+import { SubredditMode } from "./reddit";
 
 const logger = debug("rdb:bot");
 
-export type SubredditMode = "top" | "new" | "rising" | "";
 export interface SubredditMessageHanlderProps {
     channel: TextChannel;
     sender: User;
     subreddit: string;
-    subredditMode: string;
+    subredditMode: SubredditMode;
 }
 export interface RedditUrlMessageHanlderProps {
     channel: TextChannel;
