@@ -1,0 +1,5 @@
+show gif for enabling nsfw
+show info about banned / private pages
+show tip about r//
+remove 404 not found console log
+

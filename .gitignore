@@ -1,0 +1,12 @@
+node_modules/
+temp/
+badrequests/
+ff*.exe
+youtube-dl.exe
+cache/
+certs/
+bin/
+redis.conf
+db/
+.env
+*.rdb

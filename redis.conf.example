@@ -1,0 +1,13 @@
+bind 127.0.0.1
+port 6970
+dbfilename redditbot.rdb
+requirepass yourredispassword
+dir .
+save 120 10
+
+# you should change these for security
+rename-command FLUSHALL "Em9chhbWjDv3tj8sDmBGEbsdfqApDEKn63eAW"
+rename-command FLUSHDB "n3L6Z5nekAvnsbVmfPffgFmk2DfsdfzU6mfnfy"
+rename-command CONFIG "Tp3EeEYg4XhhPYNvHdXtV8KLTAmUdvdSJ2"
+rename-command SHUTDOWN "kpxuz6zpss54WVncha86zfsdfn5nGhWuXJQEy"
+rename-command DEBUG "ksvuHGG6asdfNHzqa97pRkeF5VeLK7gLhmw7"
