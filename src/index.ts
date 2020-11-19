@@ -10,7 +10,7 @@ const logger = debug("rdb");
 const bot = new RedditBot(process.env.DISCORD_TOKEN!);
 
 bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: SubredditMessageHanlderProps) => {
-    logger("redditRequest", subreddit);
+    logger("redditrequest", subreddit);
 
     let submission = await getRedditSubmission(subreddit, subredditMode, 0);
 
@@ -28,5 +28,5 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
 });
 
 bot.on("redditUrl", (props: RedditUrlMessageHanlderProps) => {
-    logger("redditUrl", props.submissionId);
+    logger("redditurl", props.submissionId);
 });

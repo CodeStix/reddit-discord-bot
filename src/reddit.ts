@@ -1,4 +1,4 @@
-import { getRedditListing, setRedditListing } from "./redis";
+import { getCachedRedditListing, storeCachedRedditListing } from "./redis";
 import { debug } from "debug";
 import fetch from "node-fetch";
 
@@ -138,14 +138,17 @@ export async function getRedditSubmission(
     let page = index / CACHE_PER_PAGE;
     let num = index % CACHE_PER_PAGE;
 
-    let cached = await getRedditListing(subreddit, subredditMode, page);
+    let cached = await getCachedRedditListing(subreddit, subredditMode, page);
     if (cached !== null) {
         logger("from cache", cached.children.length);
         return cached.children[num].data;
     } else {
-        let listing = await fetchSubmissions(subreddit, subredditMode);
+        let previousListing = null;
+        if (page > 0) previousListing = await getCachedRedditListing(subreddit, subredditMode, page - 1);
+
+        let listing = await fetchSubmissions(subreddit, subredditMode, previousListing?.after);
         logger("storing in cache", listing.children.length);
-        await setRedditListing(subreddit, subredditMode, page, listing);
+        await storeCachedRedditListing(subreddit, subredditMode, page, listing);
         return listing.children[num].data;
     }
 }

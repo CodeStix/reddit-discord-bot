@@ -24,7 +24,7 @@ const setExAsync = util.promisify(redis.setex).bind(redis);
 const EXPIRE_SUBMISSIONS = 60 * 60;
 const EXPIRE_USER_ICON = 60 * 60;
 
-export async function setRedditListing(
+export async function storeCachedRedditListing(
     subreddit: string,
     subredditMode: string,
     page: number,
@@ -33,7 +33,7 @@ export async function setRedditListing(
     await setExAsync(`r${subreddit}:${subredditMode}:${page}`, EXPIRE_SUBMISSIONS, JSON.stringify(submissions));
 }
 
-export async function getRedditListing(
+export async function getCachedRedditListing(
     subreddit: string,
     subredditMode: string,
     page: number
@@ -41,10 +41,10 @@ export async function getRedditListing(
     return JSON.parse((await getAsync(`r${subreddit}:${subredditMode}:${page}`)) ?? "null");
 }
 
-export async function getRedditUserIcon(userName: string): Promise<RedditUser | null> {
+export async function getCachedRedditUserIcon(userName: string): Promise<RedditUser | null> {
     return JSON.parse((await getAsync(`u${userName}:icon`)) ?? "null");
 }
 
-export async function storeRedditUserIcon(userName: string, icon: string) {
+export async function storeCachedRedditUserIcon(userName: string, icon: string) {
     await setExAsync(`u${userName}:icon`, EXPIRE_USER_ICON, icon);
 }
