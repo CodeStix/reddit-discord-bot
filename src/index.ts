@@ -4,6 +4,8 @@ import { Client as DiscordBot, MessageEmbed } from "discord.js";
 import { debug } from "debug";
 import { RedditBot, RedditUrlMessageHanlderProps, SubredditMessageHanlderProps } from "./RedditBot";
 import snoowrap from "snoowrap";
+import { getRedditSubmissions, setRedditSubmissions } from "./redis";
+import { getRedditSubmission } from "./reddit";
 
 const logger = debug("rdb");
 const reddit = new snoowrap({
@@ -15,23 +17,25 @@ const reddit = new snoowrap({
 
 const bot = new RedditBot(process.env.DISCORD_TOKEN!);
 
-bot.on("redditRequest", async (props: SubredditMessageHanlderProps) => {
-    logger("redditRequest", props.subreddit);
+bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: SubredditMessageHanlderProps) => {
+    logger("redditRequest", subreddit);
 
-    // Not using async/await because snoowraps typings do not accept it
-    reddit.getHot(props.subreddit, { count: 30, limit: 30 }).then((posts) => {
-        if (posts.length > 0) {
-            let post = posts[0];
-            props.channel.send(
-                new MessageEmbed()
-                    .setTitle(post.title)
-                    .setDescription(post.selftext.substring(0, 1024))
-                    .setAuthor(post.author.name)
-            );
-        } else {
-            props.channel.send("No posts available.");
-        }
-    });
+    // @ts-ignore snoowrap bug
+    let submission = await getRedditSubmission(subreddit, subredditMode, 0);
+
+    if (!submission) {
+        channel.send("No posts available.");
+        return;
+    }
+
+    // logger("submission", JSON.stringify(submission));
+
+    channel.send(
+        new MessageEmbed()
+            .setTitle(submission.title)
+            .setDescription(submission.selftext?.substring(0, 1024) ?? "<empty>")
+            .setAuthor(submission.author)
+    );
 });
 
 bot.on("redditUrl", (props: RedditUrlMessageHanlderProps) => {
