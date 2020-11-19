@@ -15,10 +15,12 @@ import {
 import cheerio from "cheerio";
 import fetch from "node-fetch";
 import { getCachedPackedUrl, getChannelIndex, storeCachedPackedUrl, storeChannelIndex } from "./redis";
+import { TopGGApi } from "./topgg";
 
 const logger = debug("rdb");
 
 const bot = new RedditBot(process.env.DISCORD_TOKEN!);
+const topgg = process.env.TOPGG_TOKEN ? new TopGGApi(process.env.TOPGG_TOKEN, bot.getBot()) : null;
 
 const TRUNCATE_TITLE_LENGTH = 200; // Max is 256
 const TRUNCATE_COMMENTS_LENGTH = 1000; // MAX_COMMENTS_LENGTH + MAX_DESCRIPTION_LENGTH is max 2048

@@ -37,6 +37,10 @@ export class RedditBot extends EventEmitter {
         this.bot.login(token);
     }
 
+    public getBot(): DiscordBot {
+        return this.bot;
+    }
+
     private handleReady() {
         logger("connected to discord");
     }
