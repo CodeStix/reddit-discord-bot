@@ -14,7 +14,8 @@ const logger = debug("rdb:reddit");
 const CACHE_PER_PAGE = 20;
 const API_BASE = "https://api.reddit.com";
 
-export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day" | "month" | "year" | "all"; // "hour" | "day" | "month" | "year" | "all" are top
+export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day" | "week" | "month" | "year" | "all"; // "hour" | "day" | "month" | "year" | "all" are top
+export const SUBREDDIT_MODES = ["hot", "new", "random", "rising", "hour", "day", "week", "month", "year", "all"];
 
 // Do not rename these fields! They come directly from the reddit API
 export interface Submission {
@@ -138,23 +139,24 @@ export async function fetchSubmissions(
     mode: SubredditMode,
     after?: string
 ): Promise<Listing<Submission>> {
-    let url = `${API_BASE}/r/${subreddit}/${mode}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all`;
-    if (after) url += `&after=${after}`;
-
+    let url;
     switch (mode) {
         case "hot":
-            url += `&g=GLOBAL`;
+            url = `${API_BASE}/r/${subreddit}/${mode}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&g=GLOBAL`;
             break;
         case "hour":
         case "day":
+        case "week":
         case "month":
         case "year":
         case "all":
-            url += `&t=${mode}`;
+            url = `${API_BASE}/r/${subreddit}/top?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&t=${mode}`;
             break;
         default:
             throw new Error(`Invalid mode '${mode}' was passed to fetchSubmissions`);
     }
+
+    if (after) url += `&after=${after}`;
 
     let res = await fetchJson(url);
     if (Array.isArray(res)) {

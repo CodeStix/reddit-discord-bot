@@ -1,8 +1,8 @@
 import { Client as DiscordBot, Message, MessageAttachment, MessageEmbed, TextChannel, User } from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
-import { SubredditMode } from "./reddit";
-import { getVideoOrDownload, getVideoPath } from "./video";
+import { SubredditMode, SUBREDDIT_MODES } from "./reddit";
+import { getVideoOrDownload } from "./video";
 import crypto from "crypto";
 
 const logger = debug("rdb:bot");
@@ -23,6 +23,7 @@ const REDDIT_URL_REGEX = /^https?:\/\/(?:www\.)?reddit\.com\/(?:r\/(?<subredditN
 
 export class RedditBot extends EventEmitter {
     public prefix: string = "b/";
+    public defaultMode: SubredditMode = "week";
 
     private bot: DiscordBot;
 
@@ -45,18 +46,62 @@ export class RedditBot extends EventEmitter {
         else if (message.content.startsWith("https://www.reddit.com/r/")) this.handleRedditUrlMessage(message);
     }
 
+    private createHelpEmbed() {
+        return new MessageEmbed().setTitle("Reddit Bot Help").setColor("#FF4301").setDescription(`
+            **You can use the \`${this.prefix}\` prefix in the following ways:**
+
+            - \`${this.prefix}pics\`: shows a top post from the r/pics subreddit.
+
+            - \`${this.prefix}pics new\`: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
+
+            - \`${this.prefix}pics top\`: shows a top post.
+
+            - \`${this.prefix}pics top week\` or \`${this.prefix}pics week\`: shows a top post from the last week. You can also use **hour**, **day**, **month**, **year** and **all**.
+
+            ℹ️ **Protip: **You can use the \`${this.prefix}/\` shortcut to repeat your previous input.
+            You can also paste a reddit url, I will convert it into a nice styled message.
+
+            ❤️ Thanks for using this bot! If you like it, you should consider [voting](https://top.gg/bot/711524405163065385).
+
+            [More information here](https://codestix.nl/article/reddit-discord-bot)
+        `);
+    }
+
     private handleSubredditMessage(message: Message) {
-        let args = message.content.substring(this.prefix.length).trim().toLowerCase().split(" ");
-        if (!args[0]) {
-            message.reply("No help for you!");
+        let args = message.content
+            .substring(this.prefix.length)
+            .trim()
+            .toLowerCase()
+            .split(/ |,|:|\//g);
+        let subreddit = args[0];
+        if (!subreddit || subreddit === "help" || subreddit === "h" || subreddit === "?") {
+            message.channel.send(this.createHelpEmbed());
             return;
+        }
+
+        let subredditMode: SubredditMode = this.defaultMode;
+        if (args.length > 1) {
+            if (!SUBREDDIT_MODES.includes(args[1])) {
+                logger("user entered wrong subreddit mode %s", args[1]);
+                message.channel.send(
+                    this.createWarningEmbed(
+                        `I don't know ${args[1]}?`,
+                        `**Please use one of the following variations:**\n` +
+                            SUBREDDIT_MODES.map(
+                                (e) => `r/${subreddit} ${e} ${e === this.defaultMode ? "**(default)**" : ""}`
+                            ).join("\n")
+                    )
+                );
+                return;
+            }
+            subredditMode = args[1] as SubredditMode;
         }
 
         let props: SubredditMessageHanlderProps = {
             channel: message.channel as TextChannel,
             sender: message.author,
-            subreddit: args[0],
-            subredditMode: "hot",
+            subreddit: subreddit,
+            subredditMode: subredditMode,
         };
 
         super.emit("redditRequest", props);
