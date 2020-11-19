@@ -2,7 +2,7 @@ import { config } from "dotenv";
 config(); // must load environment vars before anything else
 import { Client as DiscordBot, MessageEmbed, TextChannel } from "discord.js";
 import { debug } from "debug";
-import { RedditBot, RedditUrlMessageHanlderProps, SubredditMessageHanlderProps } from "./RedditBot";
+import { RedditBot, RedditUrlMessageHanlderProps, SubredditMessageHanlderProps } from "./bot";
 import {
     fetchSubmission,
     getRandomDefaultUserIcon,
