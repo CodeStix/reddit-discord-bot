@@ -9,6 +9,11 @@ const logger = debug("rdb");
 
 const bot = new RedditBot(process.env.DISCORD_TOKEN!);
 
+const TRUNCATE_TITLE_LENGTH = 200; // Max is 256
+const TRUNCATE_COMMENTS_LENGTH = 1000; // MAX_COMMENTS_LENGTH + MAX_DESCRIPTION_LENGTH is max 2048
+const TRUNCATE_DESCRIPTION_LENGTH = 1000;
+// const SKIP_DESCRIPTION_LENGTH = 400;
+
 function numberToEmoijNumber(num: number, small: boolean = false) {
     var out = "";
     if (small) {
@@ -38,6 +43,12 @@ function numberToEmoijNumber(num: number, small: boolean = false) {
     return out;
 }
 
+function truncateString(str: string, maxLength: number) {
+    const TRUNCATOR = "...";
+    if (str.length > maxLength - TRUNCATOR.length) return str.substring(0, maxLength - TRUNCATOR.length) + TRUNCATOR;
+    else return str;
+}
+
 bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: SubredditMessageHanlderProps) => {
     logger("redditrequest", subreddit);
 
@@ -56,12 +67,16 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
     let urlToSubmission = encodeURI("https://www.reddit.com" + submission.permalink);
     let urlToAuthor = encodeURI("https://www.reddit.com/u/" + submission.author);
 
+    let descriptionBuilder = "";
+    descriptionBuilder += numberToEmoijNumber(submission.score) + "\n";
+    descriptionBuilder += truncateString(submission.selftext, TRUNCATE_DESCRIPTION_LENGTH);
+
     let embed = new MessageEmbed()
-        .setTitle(submission.title)
+        .setTitle(truncateString(submission.title, TRUNCATE_TITLE_LENGTH))
         .setURL(urlToSubmission)
         .setColor(nsfw ? "#ff1111" : "#11ff11")
         .setTimestamp(submission.created * 1000)
-        .setDescription(submission.selftext?.substring(0, 1024) ?? "<empty>")
+        .setDescription(descriptionBuilder)
         .setAuthor(submission.author, cachedUserIcon ?? getRandomDefaultUserIcon(), urlToAuthor)
         .setFooter(`On r/${submission.subreddit}`, cachedSubredditIcon ?? undefined);
     let firstSentMessage = channel.send(embed);

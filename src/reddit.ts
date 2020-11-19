@@ -26,6 +26,7 @@ export interface Submission {
     over_18: boolean;
     spoiler: boolean;
     permalink: string;
+    score: number;
 }
 
 export interface RedditUser {
