@@ -3,7 +3,7 @@ config(); // must load environment vars before anything else
 import { Client as DiscordBot, MessageEmbed } from "discord.js";
 import { debug } from "debug";
 import { RedditBot, RedditUrlMessageHanlderProps, SubredditMessageHanlderProps } from "./RedditBot";
-import { getRedditSubmission, getRedditUserIcon } from "./reddit";
+import { getRedditSubmission, getRedditUserIcon, getSubredditIcon } from "./reddit";
 
 const logger = debug("rdb");
 
@@ -20,12 +20,14 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
     }
 
     let userIcon = await getRedditUserIcon(submission.author);
+    let subredditIcon = await getSubredditIcon(submission.subreddit);
 
     channel.send(
         new MessageEmbed()
             .setTitle(submission.title)
             .setDescription(submission.selftext?.substring(0, 1024) ?? "<empty>")
             .setAuthor(submission.author, userIcon)
+            .setFooter(`On r/${submission.subreddit}`, subredditIcon ?? undefined)
     );
 });
 

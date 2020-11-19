@@ -1,8 +1,10 @@
 import {
     getCachedRedditListing,
     getCachedRedditUserIcon,
+    getCachedSubredditIcon,
     storeCachedRedditListing,
     storeCachedRedditUserIcon,
+    storeCachedSubredditIcon,
 } from "./redis";
 import { debug } from "debug";
 import fetch from "node-fetch";
@@ -19,9 +21,15 @@ export interface Submission {
     selftext: string;
     title: string;
     url: string;
+    subreddit: string;
 }
 
 export interface RedditUser {
+    name: string;
+    icon_img: string;
+}
+
+export interface Subreddit {
     name: string;
     icon_img: string;
 }
@@ -121,29 +129,22 @@ export async function fetchSubmissions(
     }
 }
 
-export function getDefaultUser(name: string = "[deleted]"): RedditUser {
-    return {
-        name,
-        icon_img: getRandomDefaultUserIcon(),
-    };
-}
-
 export async function fetchUser(userName: string): Promise<RedditUser> {
-    if (!userName || userName === "[deleted]") {
-        logger("empty name '%s' was given to fetchUser, returning default user", userName);
-        return getDefaultUser(userName);
-    }
+    if (!userName || userName === "[deleted]") throw new Error(`empty name '${userName}' was given to fetchUser`);
 
     let url = `${API_BASE}/user/${userName}/about`;
     let res = await fetchJson(url);
 
-    if (!res.data) return getDefaultUser(userName);
-
-    if (typeof res.data.name !== "string") {
-        throw new Error("Invalid user response");
-    }
-
+    if (!res.data || typeof res.data.name !== "string") throw new Error("Invalid user response");
     return res.data as RedditUser;
+}
+
+export async function fetchSubreddit(subredditName: string): Promise<Subreddit> {
+    let url = `${API_BASE}/r/${subredditName}/about`;
+    let res = await fetchJson(url);
+
+    if (!res.data || typeof res.data.name !== "string") throw new Error("Invalid subreddit response");
+    return res.data as Subreddit;
 }
 
 export async function getRedditSubmission(
@@ -173,7 +174,26 @@ export async function getRedditUserIcon(userName: string): Promise<string> {
     let userIcon = await getCachedRedditUserIcon(userName);
     if (userIcon) return userIcon;
 
-    let user = await fetchUser(userName);
-    await storeCachedRedditUserIcon(userName, user.icon_img);
-    return user.icon_img;
+    try {
+        let user = await fetchUser(userName);
+        await storeCachedRedditUserIcon(userName, user.icon_img);
+        return user.icon_img;
+    } catch (ex) {
+        logger("could not get user icon for '%s':", userName, ex);
+        return getRandomDefaultUserIcon();
+    }
+}
+
+export async function getSubredditIcon(subredditName: string): Promise<string | null> {
+    let subredditIcon = await getCachedSubredditIcon(subredditName);
+    if (subredditIcon) return subredditIcon;
+
+    try {
+        let subreddit = await fetchSubreddit(subredditName);
+        await storeCachedSubredditIcon(subredditName, subreddit.icon_img);
+        return subreddit.icon_img;
+    } catch (ex) {
+        logger("could not get subreddit icon for '%s':", subredditName, ex);
+        return null;
+    }
 }
