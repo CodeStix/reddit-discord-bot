@@ -24,6 +24,7 @@ const setExAsync = util.promisify(redis.setex).bind(redis);
 const EXPIRE_SUBMISSIONS = 60 * 60;
 const EXPIRE_USER_ICON = 60 * 60;
 const EXPIRE_SUBREDDIT_ICON = 60 * 60;
+const EXPIRE_URL = 60 * 60;
 
 export async function storeCachedRedditListing(
     subreddit: string,
@@ -31,7 +32,7 @@ export async function storeCachedRedditListing(
     page: number,
     submissions: Listing<Submission>
 ) {
-    await setExAsync(`r${subreddit}:${subredditMode}:${page}`, EXPIRE_SUBMISSIONS, JSON.stringify(submissions));
+    await setExAsync(`reddit:${subreddit}:${subredditMode}:${page}`, EXPIRE_SUBMISSIONS, JSON.stringify(submissions));
 }
 
 export async function getCachedRedditListing(
@@ -39,21 +40,29 @@ export async function getCachedRedditListing(
     subredditMode: string,
     page: number
 ): Promise<Listing<Submission> | null> {
-    return JSON.parse((await getAsync(`r${subreddit}:${subredditMode}:${page}`)) ?? "null");
+    return JSON.parse((await getAsync(`reddit:${subreddit}:${subredditMode}:${page}`)) ?? "null");
 }
 
 export async function getCachedRedditUserIcon(userName: string): Promise<string | null> {
-    return await getAsync(`u${userName}:icon`);
+    return await getAsync(`user:${userName}:icon`);
 }
 
 export async function storeCachedRedditUserIcon(userName: string, icon: string) {
-    await setExAsync(`u${userName}:icon`, EXPIRE_USER_ICON, icon);
+    await setExAsync(`user:${userName}:icon`, EXPIRE_USER_ICON, icon);
 }
 
 export async function getCachedSubredditIcon(subredditName: string): Promise<string | null> {
-    return await getAsync(`r${subredditName}:icon`);
+    return await getAsync(`reddit:${subredditName}:icon`);
 }
 
 export async function storeCachedSubredditIcon(subredditName: string, icon: string) {
-    await setExAsync(`r${subredditName}:icon`, EXPIRE_SUBREDDIT_ICON, icon);
+    await setExAsync(`reddit:${subredditName}:icon`, EXPIRE_SUBREDDIT_ICON, icon);
+}
+
+export async function getCachedPackedUrl(url: string): Promise<string | null> {
+    return await getAsync(`url:${url}`);
+}
+
+export async function storeCachedPackedUrl(url: string, unpackedUrl: string) {
+    await setExAsync(`url:${url}`, EXPIRE_URL, unpackedUrl);
 }
