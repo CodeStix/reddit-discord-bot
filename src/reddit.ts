@@ -170,9 +170,10 @@ export async function getRedditSubmission(
     }
 }
 
-export async function getRedditUserIcon(userName: string): Promise<string> {
+export async function getRedditUserIcon(userName: string, cacheOnly: boolean = false): Promise<string | null> {
     let userIcon = await getCachedRedditUserIcon(userName);
-    if (userIcon) return userIcon;
+    if (userIcon !== null) return userIcon;
+    if (cacheOnly) return null;
 
     try {
         let user = await fetchUser(userName);
@@ -180,13 +181,14 @@ export async function getRedditUserIcon(userName: string): Promise<string> {
         return user.icon_img;
     } catch (ex) {
         logger("could not get user icon for '%s':", userName, ex);
-        return getRandomDefaultUserIcon();
+        return null;
     }
 }
 
-export async function getSubredditIcon(subredditName: string): Promise<string | null> {
+export async function getSubredditIcon(subredditName: string, cacheOnly: boolean = false): Promise<string | null> {
     let subredditIcon = await getCachedSubredditIcon(subredditName);
-    if (subredditIcon) return subredditIcon;
+    if (subredditIcon !== null) return subredditIcon;
+    if (cacheOnly) return null;
 
     try {
         let subreddit = await fetchSubreddit(subredditName);
