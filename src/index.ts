@@ -17,45 +17,10 @@ const TRUNCATE_COMMENTS_LENGTH = 1000; // MAX_COMMENTS_LENGTH + MAX_DESCRIPTION_
 const TRUNCATE_DESCRIPTION_LENGTH = 1000;
 // const SKIP_DESCRIPTION_LENGTH = 400;
 
-function numberToEmoijNumber(num: number, small: boolean = false) {
-    var out = "";
-    if (small) {
-        if (num === 0) {
-            out = "🔹";
-        } else if (num < 0) {
-            out = "🔻";
-        } else {
-            out = "🔺";
-        }
-        out += num;
-    } else {
-        if (num === 0) {
-            out = "⏺️ ";
-        } else if (num < 0) {
-            out = "⬇️ ";
-            num = -num;
-        } else {
-            out = "⬆️ ";
-        }
-        const str = num + "";
-        for (var i = 0; i < str.length; i++) {
-            //if ((str.length - i) % 3 == 0) out += ".";
-            out += String.fromCodePoint(str.codePointAt(i)!) + "\u20E3";
-        }
-    }
-    return out;
-}
-
-function truncateString(str: string, maxLength: number) {
-    const TRUNCATOR = "...";
-    if (str.length > maxLength - TRUNCATOR.length) return str.substring(0, maxLength - TRUNCATOR.length) + TRUNCATOR;
-    else return str;
-}
-
 bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: SubredditMessageHanlderProps) => {
     logger("redditrequest", subreddit);
 
-    let submission = await getRedditSubmission(subreddit, subredditMode, 0);
+    let submission = await getRedditSubmission(subreddit, subredditMode, 5);
 
     if (!submission) {
         channel.send("No posts available.");
@@ -108,7 +73,15 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
 
     if (otherTasks.length > 0) await Promise.all(otherTasks);
 
-    if (cachedAttachment) channel.send(cachedAttachment);
+    if (cachedAttachment) {
+        if (submission.is_video || isVideoUrl(cachedAttachment)) {
+            bot.sendVideoAttachment(channel, cachedAttachment, asSpoiler);
+        } else if (isImageUrl(cachedAttachment)) {
+            bot.sendImageAttachment(channel, cachedAttachment, asSpoiler);
+        } else {
+            bot.sendUrlAttachment(channel, cachedAttachment, asSpoiler);
+        }
+    }
 });
 
 bot.on("redditUrl", (props: RedditUrlMessageHanlderProps) => {
@@ -175,4 +148,63 @@ async function unpackUrl(url: string): Promise<string> {
         }
     }
     return url;
+}
+
+function isImageUrl(url: string): boolean {
+    return (
+        url.endsWith(".gif") ||
+        url.endsWith(".png") ||
+        url.endsWith(".jpg") ||
+        url.startsWith("https://i.redd.it/") ||
+        url.startsWith("https://i.postimg.cc/")
+    );
+}
+
+function isVideoUrl(url: string): boolean {
+    return (
+        url.endsWith(".gif") ||
+        url.endsWith(".gifv") ||
+        url.endsWith(".mp4") ||
+        url.startsWith("https://v.redd.it/") ||
+        url.startsWith("https://streamable.com/") ||
+        url.startsWith("http://clips.twitch.tv/") ||
+        url.startsWith("https://clips.twitch.tv/") ||
+        url.startsWith("https://twitter.com/") ||
+        url.startsWith("https://gfycat.com/")
+    );
+}
+
+function numberToEmoijNumber(num: number, small: boolean = false) {
+    var out = "";
+    if (small) {
+        if (num === 0) {
+            out = "🔹";
+        } else if (num < 0) {
+            out = "🔻";
+        } else {
+            out = "🔺";
+        }
+        out += num;
+    } else {
+        if (num === 0) {
+            out = "⏺️ ";
+        } else if (num < 0) {
+            out = "⬇️ ";
+            num = -num;
+        } else {
+            out = "⬆️ ";
+        }
+        const str = num + "";
+        for (var i = 0; i < str.length; i++) {
+            //if ((str.length - i) % 3 == 0) out += ".";
+            out += String.fromCodePoint(str.codePointAt(i)!) + "\u20E3";
+        }
+    }
+    return out;
+}
+
+function truncateString(str: string, maxLength: number) {
+    const TRUNCATOR = "...";
+    if (str.length > maxLength - TRUNCATOR.length) return str.substring(0, maxLength - TRUNCATOR.length) + TRUNCATOR;
+    else return str;
 }

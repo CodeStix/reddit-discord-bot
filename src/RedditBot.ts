@@ -1,7 +1,9 @@
-import { Client as DiscordBot, Message, TextChannel, User } from "discord.js";
+import { Client as DiscordBot, Message, MessageAttachment, TextChannel, User } from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
 import { SubredditMode } from "./reddit";
+import { getVideoOrDownload, getVideoPath } from "./video";
+import crypto from "crypto";
 
 const logger = debug("rdb:bot");
 
@@ -74,5 +76,40 @@ export class RedditBot extends EventEmitter {
         };
 
         super.emit("redditUrl", props);
+    }
+
+    private getUrlName(url: string) {
+        return crypto.createHash("sha1").update(url, "utf8").digest("hex");
+    }
+
+    public async sendImageAttachment(channel: TextChannel, url: string, spoiler: boolean) {
+        try {
+            let urlName = this.getUrlName(url);
+            let name = spoiler ? `SPOILER_${urlName}.png` : `image-${urlName}.png`;
+            await channel.send("", new MessageAttachment(url, name));
+        } catch (ex) {
+            logger("(warning) sendRedditAttachment: could not send as image, sending url instead:", ex);
+            await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
+        }
+    }
+
+    public async sendVideoAttachment(channel: TextChannel, url: string, spoiler: boolean) {
+        try {
+            let videoFile = await getVideoOrDownload(url);
+            let urlName = this.getUrlName(url);
+            let name = spoiler ? `SPOILER_${urlName}.mp4` : `video-${urlName}.mp4`;
+            await channel.send("", new MessageAttachment(videoFile, name));
+        } catch (ex) {
+            logger("(warning) sendRedditAttachment: could not send as video, sending url instead:", ex);
+            await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
+        }
+    }
+
+    public async sendUrlAttachment(channel: TextChannel, text: string, spoiler: boolean) {
+        if (spoiler) {
+            await channel.send(`||${text}||`);
+        } else {
+            await channel.send(text);
+        }
     }
 }

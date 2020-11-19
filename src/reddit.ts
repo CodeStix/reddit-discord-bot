@@ -16,6 +16,7 @@ const API_BASE = "https://api.reddit.com";
 
 export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day" | "month" | "year" | "all"; // "hour" | "day" | "month" | "year" | "all" are top
 
+// Do not rename these fields! They come directly from the reddit API
 export interface Submission {
     author: string;
     selftext: string;
@@ -27,6 +28,7 @@ export interface Submission {
     spoiler: boolean;
     permalink: string;
     score: number;
+    is_video: boolean;
 }
 
 export interface RedditUser {
