@@ -218,6 +218,7 @@ export async function getRedditSubmission(
         if (page > 0) previousListing = await getCachedRedditListing(subreddit, subredditMode, page - 1);
 
         listing = await fetchSubmissions(subreddit, subredditMode, previousListing?.after);
+        if (listing.children.length === 0) throw new RedditBotError("subreddit-not-found");
         await storeCachedRedditListing(subreddit, subredditMode, page, listing);
     }
 

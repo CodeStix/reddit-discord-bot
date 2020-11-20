@@ -70,11 +70,10 @@ export class RedditBot extends EventEmitter {
 
             - \`${this.prefix}pics new\`: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
 
-            - \`${this.prefix}pics top\`: shows a top post.
+            - \`${this.prefix}pics week\`: shows a top post from the last week. You can also use **hour**, **day**, **week**, **month**, **year** and **all**.
 
-            - \`${this.prefix}pics top week\` or \`${this.prefix}pics week\`: shows a top post from the last week. You can also use **hour**, **day**, **month**, **year** and **all**.
+            - \`${this.prefix}/\`: repeat your previous input.
 
-            ℹ️ **Protip: **You can use the \`${this.prefix}/\` shortcut to repeat your previous input.
             You can also paste a reddit url, I will convert it into a nice styled message.
 
             ❤️ Thanks for using this bot! If you like it, you should consider [voting](https://top.gg/bot/711524405163065385).
@@ -157,7 +156,8 @@ export class RedditBot extends EventEmitter {
                 );
                 return;
             }
-            subredditMode = args[1] as SubredditMode;
+            if (args[1] === "top") subredditMode = "week";
+            else subredditMode = args[1] as SubredditMode;
         }
 
         storePreviousInput(message.channel.id, message.author.id, raw);

@@ -44,18 +44,15 @@ export class RedditBotError extends Error {
 
             case "banned-subreddit":
                 return new MessageEmbed()
-                    .setTitle(`❌ Banned subreddit`)
-                    .setDescription(`This subreddit has been banned by Reddit. 😠 ${this.message}`)
+                    .setTitle(`❌ This subreddit has been banned by Reddit. 😠 ${this.message}`)
                     .setColor("#FF4301");
             case "private-subreddit":
                 return new MessageEmbed()
-                    .setTitle(`❌ Private subreddit`)
-                    .setDescription(`This subreddit is private, I can't access it. 😢 ${this.message}`)
+                    .setTitle(`❌ This subreddit is private, I can't access it. 😢 ${this.message}`)
                     .setColor("#FF4301");
             case "subreddit-not-found":
                 return new MessageEmbed()
-                    .setTitle(`❌ Not found?`)
-                    .setDescription(`This subreddit was not found. Misspelled? ${this.message}`)
+                    .setTitle(`❌ This subreddit was not found. Misspelled? ${this.message}`)
                     .setColor("#FF4301");
             case "unknown":
             case "unknown-fetch":
