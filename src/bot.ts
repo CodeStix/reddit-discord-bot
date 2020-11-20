@@ -1,4 +1,12 @@
-import { Client as DiscordBot, Message, MessageAttachment, MessageEmbed, TextChannel, User } from "discord.js";
+import {
+    Client as DiscordBot,
+    Message,
+    MessageAttachment,
+    MessageEmbed,
+    MessageFlags,
+    TextChannel,
+    User,
+} from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
 import { SubredditMode, SUBREDDIT_MODES } from "./reddit";
@@ -25,7 +33,9 @@ const REDDIT_URL_REGEX = /^https?:\/\/(?:www\.)?reddit\.com\/(?:r\/(?<subredditN
 export class RedditBot extends EventEmitter {
     public prefix: string = "b/";
     public defaultMode: SubredditMode = "week";
+    public minUsageInterval: number = 1500;
 
+    private processingChannels: any = {};
     private bot: DiscordBot;
 
     constructor(token: string) {
@@ -72,8 +82,20 @@ export class RedditBot extends EventEmitter {
         `);
     }
 
+    private rateLimit(channelId: string): boolean {
+        if (this.processingChannels[channelId]) return false;
+        this.processingChannels[channelId] = true;
+        setTimeout(() => delete this.processingChannels[channelId], this.minUsageInterval);
+        return true;
+    }
+
     private async handleSubredditMessage(message: Message) {
         let raw = message.content.substring(this.prefix.length).trim().toLowerCase();
+
+        if (!this.rateLimit(message.channel.id)) {
+            logger("cancelled input '%s', rate limit", raw);
+            return;
+        }
 
         if (!raw || raw === "help" || raw === "h" || raw === "?") {
             message.channel.send(this.createHelpEmbed());
@@ -127,6 +149,11 @@ export class RedditBot extends EventEmitter {
     }
 
     private handleRedditUrlMessage(message: Message) {
+        if (!this.rateLimit(message.channel.id)) {
+            logger("cancelled input '%s', rate limit", message.content);
+            return;
+        }
+
         var results = REDDIT_URL_REGEX.exec(message.content);
         if (!results || !results.groups || !results.groups.submissionId) {
             message.reply("Invalid Reddit url.");
