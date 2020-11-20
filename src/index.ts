@@ -4,6 +4,7 @@ import { Client as DiscordBot, MessageEmbed, TextChannel } from "discord.js";
 import { debug } from "debug";
 import { RedditBot, RedditUrlMessageHanlderProps, SubredditMessageHanlderProps } from "./bot";
 import {
+    Comment,
     fetchSubmission,
     getRandomDefaultUserIcon,
     getRedditSubmission,
@@ -16,6 +17,7 @@ import cheerio from "cheerio";
 import fetch from "node-fetch";
 import { getCachedPackedUrl, getChannelIndex, storeCachedPackedUrl, storeChannelIndex } from "./redis";
 import { TopGGApi } from "./topgg";
+import { chdir } from "process";
 
 const logger = debug("rdb");
 
@@ -25,6 +27,7 @@ const topgg = process.env.TOPGG_TOKEN ? new TopGGApi(process.env.TOPGG_TOKEN, bo
 const TRUNCATE_TITLE_LENGTH = 200; // Max is 256
 const TRUNCATE_COMMENTS_LENGTH = 1000; // MAX_COMMENTS_LENGTH + MAX_DESCRIPTION_LENGTH is max 2048
 const TRUNCATE_DESCRIPTION_LENGTH = 1000;
+const TRUNCATE_COMMENT_LENGTH = 200;
 const MAX_FILTER_TRIES = 35;
 const SKIP_DESCRIPTION_LENGTH = 400;
 const SKIP_MIN_POST_VOTES = 0;
@@ -125,6 +128,7 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     let cachedUserIcon = await getRedditUserIcon(submission.author, true);
     let cachedSubredditIcon = await getSubredditIcon(submission.subreddit, true);
     let cachedAttachment = urlIsAttachment ? await getUnpackedUrl(submission.url, true) : null;
+    let getCommentsTask = submission.comments ? null : fetchSubmission(submission.id, 3).then((e) => (submission = e));
 
     let descriptionBuilder = "";
     descriptionBuilder += numberToEmoijNumber(submission.score) + "\n";
@@ -146,14 +150,25 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
         embedTasks.push(getRedditUserIcon(submission.author).then((e) => (cachedUserIcon = e)));
     if (cachedSubredditIcon === null)
         embedTasks.push(getSubredditIcon(submission.subreddit).then((e) => (cachedSubredditIcon = e)));
+    if (getCommentsTask) embedTasks.push(getCommentsTask);
 
     let otherTasks = [];
     if (urlIsAttachment && cachedAttachment === null)
         otherTasks.push(getUnpackedUrl(submission.url).then((e) => (cachedAttachment = e)));
 
     if (embedTasks.length > 0) {
-        await Promise.all(embedTasks);
+        await Promise.all(embedTasks as any);
 
+        // Create comment section
+        let currentComment = submission.comments?.children.find((e) => !e.data.score_hidden)?.data;
+        let level = 0;
+        descriptionBuilder += "\n";
+        while (currentComment && currentComment.body) {
+            descriptionBuilder += createIndentedComment(currentComment, level++);
+            currentComment = currentComment.replies?.data?.children[0]?.data;
+        }
+
+        embed.setDescription(descriptionBuilder);
         embed.setAuthor(submission.author, cachedUserIcon ?? getRandomDefaultUserIcon());
         embed.setFooter(`On r/${submission.subreddit}`, cachedSubredditIcon ?? undefined);
 
@@ -286,6 +301,25 @@ function numberToEmoijNumber(num: number, small: boolean = false) {
         }
     }
     return out;
+}
+
+function createIndentedComment(comment: Comment, level: number) {
+    let title = `**${numberToEmoijNumber(comment.score, true)}** __${comment.author}__`;
+    let body = truncateString(comment.body, TRUNCATE_COMMENT_LENGTH);
+
+    if (level === 0) return "> " + title + "\n> " + body + "\n";
+
+    const MAX_WIDTH = 76; // discord embeds have a width of 75 characters
+    let width = MAX_WIDTH - level * 5;
+    let out = "";
+    let indent = "";
+    for (var i = 0; i < level; i++) indent += "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0";
+    for (var i = 0; i < body.length / width; i++) {
+        if ((i + 1) * width < body.length) out += "> " + indent + body.substring(i * width, (i + 1) * width) + "\n";
+        else out += "> " + indent + body.substring(i * width) + "\n";
+    }
+
+    return "> " + indent + title + "\n" + out;
 }
 
 function truncateString(str: string, maxLength: number) {

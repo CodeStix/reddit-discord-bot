@@ -34,6 +34,7 @@ export interface Submission {
     permalink: string;
     score: number;
     is_video: boolean;
+    comments?: Listing<Comment>;
 }
 
 export interface RedditUser {
@@ -60,6 +61,12 @@ export interface Listing<T> {
 
 export interface Comment {
     score: number;
+    body: string;
+    author: string;
+    score_hidden: boolean;
+    replies: {
+        data: Listing<Comment>;
+    };
 }
 
 export function getRandomDefaultUserIcon() {
@@ -261,14 +268,10 @@ export async function fetchSubmission(
     submissionId: string,
     maxDepth: number = 2,
     commentSortMode: CommentSortMode = DEFAULT_COMMENT_SORT
-): Promise<Submission & { comments: Listing<Comment> }> {
+): Promise<Submission> {
     let url = `${API_BASE}/comments/${submissionId}?depth=${maxDepth}&limit=${maxDepth}&sort=${commentSortMode}`;
     let listings = parseArrayListing(await fetchJson(url));
     let submission = (listings[0] as Listing<Submission>).children[0].data;
-    let comments: Listing<Comment> = listings[1];
-
-    return {
-        ...submission,
-        comments: comments,
-    };
+    submission.comments = listings[1];
+    return submission;
 }
