@@ -97,6 +97,29 @@ export class RedditBot extends EventEmitter {
             return;
         }
 
+        let permissions = message.guild!.me!.permissions;
+        if (
+            !permissions.has("ATTACH_FILES") ||
+            !permissions.has("EMBED_LINKS") ||
+            !permissions.has("SEND_MESSAGES") ||
+            !permissions.has("ADD_REACTIONS")
+        ) {
+            logger("insufficient permissions for channel (%d)", message.channel.id);
+            if (permissions.has("EMBED_LINKS")) {
+                message.channel.send(
+                    this.createErrorEmbed(
+                        "No Discord permissions",
+                        "You disabled my powers! Please allow me to **send messages**, **embed links**, **add reactions** and **attach files**."
+                    )
+                );
+            } else {
+                message.channel.send(
+                    "You disabled my powers! Please allow me to **send messages**, **embed links**, **add reactions** and **attach files**."
+                );
+            }
+            return;
+        }
+
         if (!raw || raw === "help" || raw === "h" || raw === "?") {
             message.channel.send(this.createHelpEmbed());
             return;
