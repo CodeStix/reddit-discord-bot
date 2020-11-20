@@ -63,6 +63,16 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
         return;
     }
 
+    getNextMatchingSubmission(subreddit, subredditMode, newIndex, channel)
+        .then(([, nextSubmission]) => {
+            if (!nextSubmission) return;
+            logger("preload %s", nextSubmission.permalink);
+            preloadSubmission(nextSubmission);
+        })
+        .catch((err) => {
+            logger("could not cache next submission:", err);
+        });
+
     await storeChannelIndex(channel.id, subreddit, subredditMode, newIndex);
     await sendRedditSubmission(channel, submission);
 });
