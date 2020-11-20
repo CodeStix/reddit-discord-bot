@@ -20,8 +20,19 @@ const API_BASE = "https://api.reddit.com";
 const DEFAULT_COMMENT_SORT = "top";
 
 export type CommentSortMode = "confidence" | "top" | "new" | "controversial" | "old" | "random";
-export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day" | "week" | "month" | "year" | "all"; // "hour" | "day" | "month" | "week" | "year" | "all" are top
-export const SUBREDDIT_MODES = ["hot", "new", "random", "rising", "hour", "day", "week", "month", "year", "all"];
+export type SubredditMode =
+    | "hot"
+    | "new"
+    | "random"
+    | "rising"
+    | "hour"
+    | "day"
+    | "week"
+    | "month"
+    | "year"
+    | "all"
+    | "top"; // "hour" | "day" | "month" | "week" | "year" | "all" are top
+export const SUBREDDIT_MODES = ["hot", "new", "random", "rising", "hour", "day", "week", "month", "year", "all", "top"];
 
 export type RedditFetchErrorType = "not-found" | "private" | "banned" | "unknown";
 
@@ -176,6 +187,8 @@ export async function fetchSubmissions(
         case "hot":
             url = `${API_BASE}/r/${subreddit}/${mode}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&g=GLOBAL`;
             break;
+        case "top":
+            mode = "month";
         case "hour":
         case "day":
         case "week":
