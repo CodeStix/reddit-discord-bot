@@ -229,7 +229,6 @@ async function getUnpackedUrl(url: string, cacheOnly: boolean = false): Promise<
     if (cacheOnly) return null;
 
     unpacked = await unpackUrl(url);
-    logger("caching url", url);
     await storeCachedPackedUrl(url, unpacked);
     return unpacked;
 }

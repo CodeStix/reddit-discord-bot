@@ -152,7 +152,7 @@ export class RedditBot extends EventEmitter {
             let name = spoiler ? `SPOILER_${urlName}.png` : `image-${urlName}.png`;
             await channel.send("", new MessageAttachment(url, name));
         } catch (ex) {
-            logger("(warning) sendRedditAttachment: could not send as image, sending url instead:", ex);
+            logger("could not send as image, sending url instead:", ex);
             await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
         }
     }
@@ -164,7 +164,7 @@ export class RedditBot extends EventEmitter {
             let name = spoiler ? `SPOILER_${urlName}.mp4` : `video-${urlName}.mp4`;
             await channel.send("", new MessageAttachment(videoFile, name));
         } catch (ex) {
-            logger("(warning) sendRedditAttachment: could not send as video, sending url instead:", ex);
+            logger("could not send as video, sending url instead:", ex);
             await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
         }
     }

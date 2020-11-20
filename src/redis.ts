@@ -52,6 +52,7 @@ export async function storeCachedRedditListing(
     page: number,
     submissions: Listing<Submission>
 ) {
+    logger("caching listing page %d %s/%s (%d items)", page, subreddit, subredditMode, submissions.children.length);
     await setExAsync(
         `reddit:${subreddit}:${subredditMode}:${page}`,
         getTtlForRedditMode(subredditMode),
@@ -88,6 +89,7 @@ export async function getCachedPackedUrl(url: string): Promise<string | null> {
 }
 
 export async function storeCachedPackedUrl(url: string, unpackedUrl: string) {
+    logger("caching url", url);
     await setExAsync(`url:${url}`, EXPIRE_URL, unpackedUrl);
 }
 
@@ -108,6 +110,7 @@ export async function getPreviousInput(channelId: string, userId: string): Promi
 }
 
 export async function storeCachedSubmission(submission: Submission, commentSortMode: CommentSortMode) {
+    logger("caching submission %s", submission.permalink);
     await setExAsync(`post:${submission.id}:${commentSortMode}`, EXPIRE_SUBMISSION, JSON.stringify(submission));
 }
 

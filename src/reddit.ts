@@ -226,7 +226,6 @@ export async function getRedditSubmission(
         if (page > 0) previousListing = await getCachedRedditListing(subreddit, subredditMode, page - 1);
 
         listing = await fetchSubmissions(subreddit, subredditMode, previousListing?.after);
-        logger("caching listing page %d %s/%s (%d items)", page, subreddit, subredditMode, listing.children.length);
         await storeCachedRedditListing(subreddit, subredditMode, page, listing);
     }
 
@@ -292,6 +291,5 @@ export async function getSubmission(
 
     submission = await fetchSubmission(submissionId, maxDepth, commentSortMode);
     await storeCachedSubmission(submission, commentSortMode);
-    logger("caching submission %s", submission.permalink);
     return submission;
 }
