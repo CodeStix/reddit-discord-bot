@@ -4,6 +4,7 @@ import fs from "fs";
 import { debug } from "debug";
 import { exec } from "child_process";
 import util from "util";
+import { RedditBotError } from "./error";
 
 const VIDEO_CACHE_PATH = path.join(__dirname, "cache/videos");
 const FFMPEG_CACHE_PATH = path.join(__dirname, "cache/ffmpeg");
@@ -58,7 +59,7 @@ export async function downloadVideo(url: string, path: string, maxVideoFileSize:
         await execAsync(youtubeCmd);
     } catch (ex) {
         logger("could not download video using youtube-dl:", ex);
-        throw new Error("Error while downloading video.");
+        throw new RedditBotError("video-download", url);
     }
 
     let videoInfo;
@@ -66,12 +67,12 @@ export async function downloadVideo(url: string, path: string, maxVideoFileSize:
         videoInfo = await getVideoInfo(tempVideoFile);
     } catch (ex) {
         logger("could not get video info:", videoInfo);
-        throw new Error("Could not get video information.");
+        throw new RedditBotError("video-download", url);
     }
 
     if (!videoInfo.format.duration || videoInfo.format.duration > MAX_VIDEO_COMPRESS_LENGTH) {
         logger("video is too long (%d), not downloading", videoInfo.format.duration);
-        throw new Error("Video is too long!");
+        throw new RedditBotError("video-too-long", url);
     }
 
     // Compress if video file size is too large or if mpegts file (discord does not display these)
@@ -80,7 +81,7 @@ export async function downloadVideo(url: string, path: string, maxVideoFileSize:
         videoInfo.format.format_name.includes("mpegts") ||
         videoInfo.format.format_name.includes("gif")
     ) {
-        logger("getCachedVideoTask: compressing, video format:", videoInfo.format);
+        logger("compressing video (size=%f, duration=%f)", videoInfo.format.size, videoInfo.format.duration);
         let targetAudioBitrate = 35000;
         let targetFramerate = 24;
         let targetBitrate = (maxVideoFileSize * 8) / (videoInfo.format.duration * 1.4) - targetAudioBitrate;
@@ -88,8 +89,8 @@ export async function downloadVideo(url: string, path: string, maxVideoFileSize:
         try {
             await compressVideo(tempVideoFile, path, targetBitrate, targetFramerate, targetAudioBitrate);
         } catch (ex) {
-            logger("(error) getCachedVideoTask: could not compress video:", ex);
-            throw new Error("Error while compressing video.");
+            logger("could not compress video:", ex);
+            throw new RedditBotError("video-compress", url);
         }
 
         fs.unlink(tempVideoFile, () => {});
@@ -119,24 +120,16 @@ export async function compressVideo(
 
         let took = process.hrtime(startTime);
         logger("compressing video took %f ms", took[0] * 1000 + took[1] / 1000000);
-    } catch (ex) {
-        logger("could not compress video:", ex.message);
-        throw ex;
     } finally {
         // remove the by ffmpeg created passlog file
         fs.unlink(passLogPath + "-0.log", (err) => {
-            if (err) logger("(warning) compressVideo: could not remove pass log file:", err);
+            if (err) logger("warning: could not remove pass log file:", err);
         });
     }
 }
 
 export async function getVideoInfo(inputPath: string) {
-    try {
-        const probeCmd = `ffprobe -i "${inputPath}" -v quiet -print_format json -show_format -hide_banner`;
-        let { stdout } = await execAsync(probeCmd);
-        return JSON.parse(stdout);
-    } catch (ex) {
-        logger("could not get video info:", ex.message);
-        throw ex;
-    }
+    const probeCmd = `ffprobe -i "${inputPath}" -v quiet -print_format json -show_format -hide_banner`;
+    let { stdout } = await execAsync(probeCmd);
+    return JSON.parse(stdout);
 }

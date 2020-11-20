@@ -7,7 +7,10 @@ export type RedditBotErrorType =
     | "no-matching-posts"
     | "end-of-feed"
     | "unknown"
-    | "unknown-fetch";
+    | "unknown-fetch"
+    | "video-compress"
+    | "video-download"
+    | "video-too-long";
 
 export function createUnknownErrorEmbed(message?: string) {
     return new MessageEmbed()
@@ -57,6 +60,13 @@ export class RedditBotError extends Error {
             case "unknown":
             case "unknown-fetch":
                 return createUnknownErrorEmbed(this.message);
+            case "video-download":
+            case "video-compress":
+            case "video-too-long":
+                return new MessageEmbed()
+                    .setTitle(`❌ Video error`)
+                    .setDescription(`Could not download video, take a link instead: ${this.message}`)
+                    .setColor("#FF4301");
         }
     }
 

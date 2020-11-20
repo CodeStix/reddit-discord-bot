@@ -133,6 +133,7 @@ const AFTER_FETCH_REPLACE: any = {
     "&amp;": "&",
     "&quot;": "'",
     "&lt;": "<",
+    "&gt;": ">",
 };
 const AFTER_FETCH_REGEX = new RegExp(Object.keys(AFTER_FETCH_REPLACE).join("|"), "gi");
 
