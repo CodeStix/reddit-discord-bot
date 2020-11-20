@@ -36,27 +36,6 @@ export const SUBREDDIT_MODES = ["hot", "new", "random", "rising", "hour", "day",
 
 export type RedditFetchErrorType = "not-found" | "private" | "banned" | "unknown";
 
-// export class RedditFetchError extends Error {
-//     public type: RedditFetchErrorType;
-
-//     static fromReddit404ErrorData(data?: any) {
-//         if (!data) return new RedditFetchError("unknown", "An unknown reddit error has occured.");
-//         if (data.reason === "banned")
-//             return new RedditFetchError("banned", "This subreddit has been banned by Reddit.");
-//         if (data.reason === "private")
-//             return new RedditFetchError("private", "This subreddit is private and cannot be accessed by me 😢");
-//         throw new RedditFetchError("not-found", "This subreddit does not exist. Misspelled?");
-//     }
-
-//     constructor(type: RedditFetchErrorType = "unknown", message?: string) {
-//         let trueProto = new.target.prototype; // https://stackoverflow.com/questions/55065742/implementing-instanceof-checks-for-custom-typescript-error-instances
-//         super(message);
-//         Object.setPrototypeOf(this, trueProto);
-//         this.name = "RedditFetchError";
-//         this.type = type;
-//     }
-// }
-
 // Do not rename these fields! They come directly from the reddit API
 export interface Submission {
     id: string;

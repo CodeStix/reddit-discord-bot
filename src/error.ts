@@ -50,7 +50,7 @@ export class RedditBotError extends Error {
             case "private-subreddit":
                 return new MessageEmbed()
                     .setTitle(`❌ Private subreddit`)
-                    .setDescription(`This subreddit is private and cannot be accessed by me. 😢 ${this.message}`)
+                    .setDescription(`This subreddit is private, I can't access it. 😢 ${this.message}`)
                     .setColor("#FF4301");
             case "subreddit-not-found":
                 return new MessageEmbed()

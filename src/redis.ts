@@ -21,12 +21,11 @@ const setAsync = util.promisify(redis.set).bind(redis);
 const getAsync = util.promisify(redis.get).bind(redis);
 const setExAsync = util.promisify(redis.setex).bind(redis);
 
-const EXPIRE_USER_ICON = 60 * 60;
-const EXPIRE_SUBREDDIT_ICON = 60 * 60;
-const EXPIRE_URL = 60 * 60;
-const EXPIRE_CHANNEL_INDEX = 60 * 60;
-const EXPIRE_USER_INPUT = 60 * 60;
-const EXPIRE_SUBMISSION = 60 * 60;
+const EXPIRE_USER_ICON = 60 * 60 * 24 * 2;
+const EXPIRE_SUBREDDIT_ICON = 60 * 60 * 24 * 15;
+const EXPIRE_URL = 60 * 60 * 24 * 15;
+const EXPIRE_USER_INPUT = 60 * 60 * 24 * 30;
+const EXPIRE_SUBMISSION = 60 * 60 * 24 * 5;
 
 function getTtlForRedditMode(mode: SubredditMode) {
     switch (mode) {
@@ -93,12 +92,25 @@ export async function storeCachedPackedUrl(url: string, unpackedUrl: string) {
     await setExAsync(`url:${url}`, EXPIRE_URL, unpackedUrl);
 }
 
-export async function getChannelIndex(channelId: string, subreddit: string, subredditMode: string): Promise<number> {
+export async function getChannelIndex(
+    channelId: string,
+    subreddit: string,
+    subredditMode: SubredditMode
+): Promise<number> {
     return parseInt((await getAsync(`channel:${channelId}:${subreddit}:${subredditMode}:index`)) ?? "0");
 }
 
-export async function storeChannelIndex(channelId: string, subreddit: string, subredditMode: string, index: number) {
-    await setExAsync(`channel:${channelId}:${subreddit}:${subredditMode}:index`, EXPIRE_CHANNEL_INDEX, "" + index);
+export async function storeChannelIndex(
+    channelId: string,
+    subreddit: string,
+    subredditMode: SubredditMode,
+    index: number
+) {
+    await setExAsync(
+        `channel:${channelId}:${subreddit}:${subredditMode}:index`,
+        getTtlForRedditMode(subredditMode),
+        "" + index
+    );
 }
 
 export async function storePreviousInput(channelId: string, userId: string, input: string) {
