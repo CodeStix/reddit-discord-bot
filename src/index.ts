@@ -9,7 +9,9 @@ import {
     getRandomDefaultUserIcon,
     getRedditSubmission,
     getRedditUserIcon,
+    getSubmission,
     getSubredditIcon,
+    Listing,
     RedditFetchError,
     Submission,
 } from "./reddit";
@@ -128,11 +130,12 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     let cachedUserIcon = await getRedditUserIcon(submission.author, true);
     let cachedSubredditIcon = await getSubredditIcon(submission.subreddit, true);
     let cachedAttachment = urlIsAttachment ? await getUnpackedUrl(submission.url, true) : null;
-    let getCommentsTask = submission.comments ? null : fetchSubmission(submission.id, 3).then((e) => (submission = e));
+    let cachedDetails = await getSubmission(submission.id, true, 3);
 
     let descriptionBuilder = "";
     descriptionBuilder += numberToEmoijNumber(submission.score) + "\n";
     descriptionBuilder += truncateString(submission.selftext, TRUNCATE_DESCRIPTION_LENGTH);
+    if (cachedDetails && cachedDetails.comments) descriptionBuilder += createCommentSection(cachedDetails.comments);
 
     let embed = new MessageEmbed()
         .setTitle(truncateString(submission.title, TRUNCATE_TITLE_LENGTH))
@@ -150,7 +153,7 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
         embedTasks.push(getRedditUserIcon(submission.author).then((e) => (cachedUserIcon = e)));
     if (cachedSubredditIcon === null)
         embedTasks.push(getSubredditIcon(submission.subreddit).then((e) => (cachedSubredditIcon = e)));
-    if (getCommentsTask) embedTasks.push(getCommentsTask);
+    if (cachedDetails === null) embedTasks.push(getSubmission(submission.id).then((e) => (cachedDetails = e)));
 
     let otherTasks = [];
     if (urlIsAttachment && cachedAttachment === null)
@@ -159,13 +162,10 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     if (embedTasks.length > 0) {
         await Promise.all(embedTasks as any);
 
-        // Create comment section
-        let currentComment = submission.comments?.children.find((e) => !e.data.score_hidden)?.data;
-        let level = 0;
-        descriptionBuilder += "\n";
-        while (currentComment && currentComment.body) {
-            descriptionBuilder += createIndentedComment(currentComment, level++);
-            currentComment = currentComment.replies?.data?.children[0]?.data;
+        if (cachedDetails && cachedDetails.comments) {
+            descriptionBuilder += createCommentSection(cachedDetails.comments);
+        } else {
+            logger("cached details is null");
         }
 
         embed.setDescription(descriptionBuilder);
@@ -186,6 +186,17 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
             bot.sendUrlAttachment(channel, cachedAttachment, asSpoiler);
         }
     }
+}
+
+function createCommentSection(comments: Listing<Comment>): string {
+    let builder = "\n";
+    let currentComment = comments?.children.find((e) => !e.data.score_hidden)?.data;
+    let level = 0;
+    while (currentComment && currentComment.body) {
+        builder += createIndentedComment(currentComment, level++);
+        currentComment = currentComment.replies?.data?.children[0]?.data;
+    }
+    return builder;
 }
 
 async function getUnpackedUrl(url: string, cacheOnly: boolean = false): Promise<string | null> {

@@ -1,9 +1,11 @@
 import {
     getCachedRedditListing,
     getCachedRedditUserIcon,
+    getCachedSubmission,
     getCachedSubredditIcon,
     storeCachedRedditListing,
     storeCachedRedditUserIcon,
+    storeCachedSubmission,
     storeCachedSubredditIcon,
 } from "./redis";
 import { debug } from "debug";
@@ -273,5 +275,21 @@ export async function fetchSubmission(
     let listings = parseArrayListing(await fetchJson(url));
     let submission = (listings[0] as Listing<Submission>).children[0].data;
     submission.comments = listings[1];
+    return submission;
+}
+
+export async function getSubmission(
+    submissionId: string,
+    cacheOnly: boolean = false,
+    maxDepth: number = 2,
+    commentSortMode: CommentSortMode = DEFAULT_COMMENT_SORT
+): Promise<Submission | null> {
+    let submission = await getCachedSubmission(submissionId, commentSortMode);
+    if (submission !== null) return submission;
+    if (cacheOnly) return null;
+
+    submission = await fetchSubmission(submissionId, maxDepth, commentSortMode);
+    await storeCachedSubmission(submission, commentSortMode);
+    logger("caching submission %s", submission.permalink);
     return submission;
 }

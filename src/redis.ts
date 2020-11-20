@@ -1,7 +1,7 @@
 import { RedisClient } from "redis";
 import { debug } from "debug";
 import util from "util";
-import { Listing, RedditUser, Submission, SubredditMode } from "./reddit";
+import { CommentSortMode, Listing, RedditUser, Submission, SubredditMode } from "./reddit";
 
 const logger = debug("rdb:redis");
 
@@ -26,6 +26,7 @@ const EXPIRE_SUBREDDIT_ICON = 60 * 60;
 const EXPIRE_URL = 60 * 60;
 const EXPIRE_CHANNEL_INDEX = 60 * 60;
 const EXPIRE_USER_INPUT = 60 * 60;
+const EXPIRE_SUBMISSION = 60 * 60;
 
 function getTtlForRedditMode(mode: SubredditMode) {
     switch (mode) {
@@ -104,4 +105,15 @@ export async function storePreviousInput(channelId: string, userId: string, inpu
 
 export async function getPreviousInput(channelId: string, userId: string): Promise<string | null> {
     return await getAsync(`channel:${channelId}:${userId}:prev`);
+}
+
+export async function storeCachedSubmission(submission: Submission, commentSortMode: CommentSortMode) {
+    await setExAsync(`post:${submission.id}:${commentSortMode}`, EXPIRE_SUBMISSION, JSON.stringify(submission));
+}
+
+export async function getCachedSubmission(
+    submissionId: string,
+    commentSortMode: CommentSortMode
+): Promise<Submission | null> {
+    return JSON.parse((await getAsync(`post:${submissionId}:${commentSortMode}`)) ?? "null");
 }
