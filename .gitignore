@@ -12,3 +12,4 @@ db/
 *.rdb
 todo.txt
 logs/
+dist/

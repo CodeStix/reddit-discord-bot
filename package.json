@@ -13,7 +13,8 @@
     "redis": "^3.0.2"
   },
   "scripts": {
-    "migrate": "ts-node util/migrate.ts"
+    "migrate": "ts-node util/migrate.ts",
+    "build": "tsc"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.22",

@@ -14,7 +14,7 @@ bot.login(process.env.DISCORD_TOKEN);
 
 bot.on("message", (message) => {
     if (message.channel.type !== "text") return;
-    if (message.content.startsWith("b/") || message.content.startsWith("https://www.reddit.com/r/")) {
+    if (message.content.startsWith("r/") || message.content.startsWith("https://www.reddit.com/r/")) {
         message.channel.send(
             new discord.MessageEmbed()
                 .setTitle("Maintenance mode 😮")
