@@ -21,8 +21,8 @@ const setAsync = util.promisify(redis.set).bind(redis);
 const getAsync = util.promisify(redis.get).bind(redis);
 const setExAsync = util.promisify(redis.setex).bind(redis);
 
-const EXPIRE_USER_ICON = 60 * 60 * 24 * 2;
-const EXPIRE_SUBREDDIT_ICON = 60 * 60 * 24 * 15;
+const EXPIRE_USER_ICON = 60 * 60 * 8;
+const EXPIRE_SUBREDDIT_ICON = 60 * 60 * 24 * 5;
 const EXPIRE_URL = 60 * 60 * 24 * 15;
 const EXPIRE_USER_INPUT = 60 * 60 * 24 * 30;
 const EXPIRE_SUBMISSION = 60 * 60 * 24 * 5;
