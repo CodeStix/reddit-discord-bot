@@ -12,14 +12,16 @@ import {
     getSubmission,
     getSubredditIcon,
     Listing,
-    RedditFetchError,
     Submission,
+    SubredditMode,
 } from "./reddit";
 import cheerio from "cheerio";
 import fetch from "node-fetch";
 import { getCachedPackedUrl, getChannelIndex, storeCachedPackedUrl, storeChannelIndex } from "./redis";
 import { TopGGApi } from "./topgg";
 import { chdir } from "process";
+import { getVideoOrDownload } from "./video";
+import { createUnknownErrorEmbed, RedditBotError } from "./error";
 
 const logger = debug("rdb");
 
@@ -46,53 +48,22 @@ function matchesChannelFilters(channel: TextChannel, submission: Submission): bo
 bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: SubredditMessageHanlderProps) => {
     logger("redditrequest", subreddit);
 
-    let index = await getChannelIndex(channel.id, subreddit, subredditMode);
-
-    let triesRemaining = MAX_FILTER_TRIES;
-    let submission;
-    do {
-        try {
-            submission = await getRedditSubmission(subreddit, subredditMode, index++);
-        } catch (ex) {
-            if (ex instanceof RedditFetchError) {
-                logger("reddit fetch error (%s): %s", ex.type, ex.message);
-                await channel.send(bot.createErrorEmbed("Reddit error", ex.message));
-            } else {
-                logger("unknown error", ex);
-                await channel.send(
-                    bot
-                        .createWarningEmbed(
-                            "Unknown problem",
-                            "Beep boop, the bot has self destructed, i hope a developer will look at this error message..."
-                        )
-                        .setFooter("This error got automatically submitted to the devs.")
-                );
-            }
-            return;
+    let currentIndex = await getChannelIndex(channel.id, subreddit, subredditMode);
+    let newIndex, submission;
+    try {
+        [newIndex, submission] = await getNextMatchingSubmission(subreddit, subredditMode, currentIndex, channel);
+    } catch (ex) {
+        if (ex instanceof RedditBotError) {
+            logger("bot error (%s): %s", ex.type, ex.message);
+            await channel.send(ex.createEmbed());
+        } else {
+            logger("unknown error", ex);
+            await channel.send(createUnknownErrorEmbed());
         }
+        return;
+    }
 
-        if (!submission) {
-            await channel.send(
-                bot.createWarningEmbed(
-                    "End of feed",
-                    `You've reached the end of the **r/${subreddit}/${subredditMode}** subreddit. Come back later for new posts, or browse a different subreddit.`
-                )
-            );
-            return;
-        }
-
-        if (--triesRemaining <= 0) {
-            await channel.send(
-                bot
-                    .createWarningEmbed("No posts match your filters. Try enabling NSFW to show more content.", "")
-                    .setImage("https://github.com/CodeStix/reddit-discord-bot/raw/master/images/enable-nsfw.gif")
-            );
-            return;
-        }
-    } while (!matchesChannelFilters(channel, submission));
-
-    await storeChannelIndex(channel.id, subreddit, subredditMode, index);
-
+    await storeChannelIndex(channel.id, subreddit, subredditMode, newIndex);
     await sendRedditSubmission(channel, submission);
 });
 
@@ -103,19 +74,12 @@ bot.on("redditUrl", async (props: RedditUrlMessageHanlderProps) => {
         let submission = await fetchSubmission(props.submissionId);
         await sendRedditSubmission(props.channel, submission);
     } catch (ex) {
-        if (ex instanceof RedditFetchError) {
-            logger("reddit fetch error (%s): %s", ex.type, ex.message);
-            await props.channel.send(bot.createErrorEmbed("Reddit error", ex.message));
+        if (ex instanceof RedditBotError) {
+            logger("bot error (%s): %s", ex.type, ex.message);
+            await props.channel.send(ex.createEmbed());
         } else {
             logger("unknown error", ex);
-            await props.channel.send(
-                bot
-                    .createWarningEmbed(
-                        "Unknown problem",
-                        "Beep boop, the bot has self destructed, i hope a developer will look at this error message..."
-                    )
-                    .setFooter("This error got automatically submitted to the devs.")
-            );
+            await props.channel.send(createUnknownErrorEmbed());
         }
     }
 });
@@ -186,6 +150,56 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
             bot.sendUrlAttachment(channel, cachedAttachment, asSpoiler);
         }
     }
+}
+
+async function preloadSubmission(submission: Submission) {
+    let urlToSubmission = encodeURI("https://www.reddit.com" + submission.permalink);
+    let urlIsAttachment = urlToSubmission !== submission.url;
+
+    async function preloadAttachment(url: string | null) {
+        if (!url) return;
+        if (isVideoUrl(url)) {
+            await getVideoOrDownload(url);
+        }
+    }
+
+    let tasks = [];
+    tasks.push(getRedditUserIcon(submission.author));
+    tasks.push(getSubredditIcon(submission.subreddit));
+    tasks.push(getSubmission(submission.id, false, 3));
+    if (urlIsAttachment) tasks.push(getUnpackedUrl(submission.url).then(preloadAttachment));
+
+    try {
+        await Promise.all(tasks as any);
+    } catch (ex) {
+        logger("error while preloading", ex);
+    }
+}
+
+async function getNextMatchingSubmission(
+    subreddit: string,
+    subredditMode: SubredditMode,
+    index: number,
+    channel: TextChannel
+): Promise<[number, Submission]> {
+    let triesRemaining = MAX_FILTER_TRIES;
+    let submission;
+    do {
+        if (triesRemaining-- <= 0)
+            throw new RedditBotError(
+                "no-matching-posts",
+                `No posts match your filters. Try enabling NSFW to show more content.`
+            );
+
+        submission = await getRedditSubmission(subreddit, subredditMode, index++);
+
+        if (!submission)
+            throw new RedditBotError(
+                "end-of-feed",
+                `You've reached the end of the **r/${subreddit}/${subredditMode}** subreddit. Come back later for new posts, or browse a different subreddit.`
+            );
+    } while (!matchesChannelFilters(channel, submission));
+    return [index, submission];
 }
 
 function createCommentSection(comments: Listing<Comment>): string {

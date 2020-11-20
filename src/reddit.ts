@@ -11,6 +11,7 @@ import {
 import { debug } from "debug";
 import fetch from "node-fetch";
 import fs from "fs";
+import { RedditBotError } from "./error";
 
 const logger = debug("rdb:reddit");
 
@@ -21,6 +22,29 @@ const DEFAULT_COMMENT_SORT = "top";
 export type CommentSortMode = "confidence" | "top" | "new" | "controversial" | "old" | "random";
 export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day" | "week" | "month" | "year" | "all"; // "hour" | "day" | "month" | "week" | "year" | "all" are top
 export const SUBREDDIT_MODES = ["hot", "new", "random", "rising", "hour", "day", "week", "month", "year", "all"];
+
+export type RedditFetchErrorType = "not-found" | "private" | "banned" | "unknown";
+
+// export class RedditFetchError extends Error {
+//     public type: RedditFetchErrorType;
+
+//     static fromReddit404ErrorData(data?: any) {
+//         if (!data) return new RedditFetchError("unknown", "An unknown reddit error has occured.");
+//         if (data.reason === "banned")
+//             return new RedditFetchError("banned", "This subreddit has been banned by Reddit.");
+//         if (data.reason === "private")
+//             return new RedditFetchError("private", "This subreddit is private and cannot be accessed by me 😢");
+//         throw new RedditFetchError("not-found", "This subreddit does not exist. Misspelled?");
+//     }
+
+//     constructor(type: RedditFetchErrorType = "unknown", message?: string) {
+//         let trueProto = new.target.prototype; // https://stackoverflow.com/questions/55065742/implementing-instanceof-checks-for-custom-typescript-error-instances
+//         super(message);
+//         Object.setPrototypeOf(this, trueProto);
+//         this.name = "RedditFetchError";
+//         this.type = type;
+//     }
+// }
 
 // Do not rename these fields! They come directly from the reddit API
 export interface Submission {
@@ -112,8 +136,6 @@ const AFTER_FETCH_REPLACE: any = {
 };
 const AFTER_FETCH_REGEX = new RegExp(Object.keys(AFTER_FETCH_REPLACE).join("|"), "gi");
 
-export type RedditFetchErrorType = "not-found" | "private" | "banned" | "unknown";
-
 function parseListing<TListing>(res: any): Listing<TListing> {
     let listing: Listing<TListing> = res.data;
     if (!listing) throw new Error(`No listing was returned`);
@@ -127,27 +149,6 @@ function parseArrayListing(res: any): Listing<any>[] {
     return res.map((e) => e.data);
 }
 
-export class RedditFetchError extends Error {
-    public type: RedditFetchErrorType;
-
-    static fromReddit404ErrorData(data?: any) {
-        if (!data) return new RedditFetchError("unknown", "An unknown reddit error has occured.");
-        if (data.reason === "banned")
-            return new RedditFetchError("banned", "This subreddit has been banned by Reddit.");
-        if (data.reason === "private")
-            return new RedditFetchError("private", "This subreddit is private and cannot be accessed by me 😢");
-        throw new RedditFetchError("not-found", "This subreddit does not exist. Misspelled?");
-    }
-
-    constructor(type: RedditFetchErrorType = "unknown", message?: string) {
-        let trueProto = new.target.prototype; // https://stackoverflow.com/questions/55065742/implementing-instanceof-checks-for-custom-typescript-error-instances
-        super(message);
-        Object.setPrototypeOf(this, trueProto);
-        this.name = "RedditFetchError";
-        this.type = type;
-    }
-}
-
 async function fetchJson(url: string): Promise<any> {
     let res = await fetch(url);
     let text = await res.text();
@@ -156,11 +157,11 @@ async function fetchJson(url: string): Promise<any> {
     if (res.ok) {
         return obj;
     } else if (res.status === 404) {
-        throw RedditFetchError.fromReddit404ErrorData(obj);
+        throw RedditBotError.fromReddit404ErrorData(obj);
     } else if (res.status === 403) {
-        throw new RedditFetchError("private");
+        throw new RedditBotError("private-subreddit");
     } else {
-        throw new RedditFetchError("unknown");
+        throw new RedditBotError("unknown-fetch");
     }
 }
 

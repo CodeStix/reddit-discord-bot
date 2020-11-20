@@ -1,7 +1,7 @@
 import { Client as DiscordBot, Message, MessageAttachment, MessageEmbed, TextChannel, User } from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
-import { RedditFetchError, SubredditMode, SUBREDDIT_MODES } from "./reddit";
+import { SubredditMode, SUBREDDIT_MODES } from "./reddit";
 import { getVideoOrDownload } from "./video";
 import crypto from "crypto";
 import { getPreviousInput, storePreviousInput } from "./redis";
