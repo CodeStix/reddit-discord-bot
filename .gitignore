@@ -11,3 +11,4 @@ db/
 .env
 *.rdb
 todo.txt
+logs/

@@ -8,17 +8,21 @@ import {
 } from "./redis";
 import { debug } from "debug";
 import fetch from "node-fetch";
+import fs from "fs";
 
 const logger = debug("rdb:reddit");
 
 const CACHE_PER_PAGE = 20;
 const API_BASE = "https://api.reddit.com";
+const DEFAULT_COMMENT_SORT = "top";
 
-export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day" | "week" | "month" | "year" | "all"; // "hour" | "day" | "month" | "year" | "all" are top
+export type CommentSortMode = "confidence" | "top" | "new" | "controversial" | "old" | "random";
+export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day" | "week" | "month" | "year" | "all"; // "hour" | "day" | "month" | "week" | "year" | "all" are top
 export const SUBREDDIT_MODES = ["hot", "new", "random", "rising", "hour", "day", "week", "month", "year", "all"];
 
 // Do not rename these fields! They come directly from the reddit API
 export interface Submission {
+    id: string;
     author: string;
     selftext: string;
     created: number;
@@ -52,6 +56,10 @@ export interface Listing<T> {
         kind: string;
         data: T;
     }[];
+}
+
+export interface Comment {
+    score: number;
 }
 
 export function getRandomDefaultUserIcon() {
@@ -96,6 +104,19 @@ const AFTER_FETCH_REPLACE: any = {
 const AFTER_FETCH_REGEX = new RegExp(Object.keys(AFTER_FETCH_REPLACE).join("|"), "gi");
 
 export type RedditFetchErrorType = "not-found" | "private" | "banned" | "unknown";
+
+function parseListing<TListing>(res: any): Listing<TListing> {
+    let listing: Listing<TListing> = res.data;
+    if (!listing) throw new Error(`No listing was returned`);
+    if (!listing.children) throw new Error(`Invalid listing was returned`);
+    return listing;
+}
+
+function parseArrayListing(res: any): Listing<any>[] {
+    if (!Array.isArray(res)) throw new Error("Invalid array listing response.");
+    if (res.length === 0 || !res[0].data) throw new Error("Empty array listing response.");
+    return res.map((e) => e.data);
+}
 
 export class RedditFetchError extends Error {
     public type: RedditFetchErrorType;
@@ -158,16 +179,7 @@ export async function fetchSubmissions(
 
     if (after) url += `&after=${after}`;
 
-    let res = await fetchJson(url);
-    if (Array.isArray(res)) {
-        // Reddit API sometimes returnes array instead of object
-        if (res.length === 0)
-            throw new Error(`No listing was returned for r/${subreddit}/${mode} after=${after ?? "<null>"}`);
-        return res[0].data as Listing<Submission>;
-    } else {
-        if (!res.data) throw new Error(`No listing was returned for r/${subreddit}/${mode} after=${after ?? "<null>"}`);
-        return res.data as Listing<Submission>;
-    }
+    return parseListing<Submission>(await fetchJson(url));
 }
 
 export async function fetchUser(userName: string): Promise<RedditUser> {
@@ -245,15 +257,18 @@ export async function getSubredditIcon(subredditName: string, cacheOnly: boolean
     }
 }
 
-export async function fetchSubmission(submissionId: string) {
-    let url = `${API_BASE}/comments/${submissionId}`;
-    let res = await fetchJson(url);
-    if (Array.isArray(res)) {
-        // Reddit API sometimes returnes array instead of object
-        if (res.length === 0) throw new Error(`No submissions were returned.`);
-        return res[0].data.children[0].data as Submission;
-    } else {
-        if (!res.data) throw new Error(`No submissions were returned.`);
-        return res.data.children[0].data as Submission;
-    }
+export async function fetchSubmission(
+    submissionId: string,
+    maxDepth: number = 2,
+    commentSortMode: CommentSortMode = DEFAULT_COMMENT_SORT
+): Promise<Submission & { comments: Listing<Comment> }> {
+    let url = `${API_BASE}/comments/${submissionId}?depth=${maxDepth}&limit=${maxDepth}&sort=${commentSortMode}`;
+    let listings = parseArrayListing(await fetchJson(url));
+    let submission = (listings[0] as Listing<Submission>).children[0].data;
+    let comments: Listing<Comment> = listings[1];
+
+    return {
+        ...submission,
+        comments: comments,
+    };
 }
