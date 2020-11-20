@@ -25,7 +25,7 @@ import { createUnknownErrorEmbed, RedditBotError } from "./error";
 
 const logger = debug("rdb");
 
-const bot = new RedditBot(process.env.DISCORD_TOKEN!);
+const bot = new RedditBot(process.env.DISCORD_TOKEN!, process.env.PREFIX ?? "r/");
 const topgg = process.env.TOPGG_TOKEN ? new TopGGApi(process.env.TOPGG_TOKEN, bot.getBot()) : null;
 
 const TRUNCATE_TITLE_LENGTH = 200; // Max is 256

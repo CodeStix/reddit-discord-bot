@@ -31,15 +31,16 @@ export interface RedditUrlMessageHanlderProps {
 const REDDIT_URL_REGEX = /^https?:\/\/(?:www\.)?reddit\.com\/(?:r\/(?<subredditName>[\w\d]+)\/)?comments\/(?<submissionId>[\w\d]+)/i;
 
 export class RedditBot extends EventEmitter {
-    public prefix: string = "b/";
+    public prefix: string;
     public defaultMode: SubredditMode = "week";
     public minUsageInterval: number = 1500;
 
     private processingChannels: any = {};
     private bot: DiscordBot;
 
-    constructor(token: string) {
+    constructor(token: string, prefix: string) {
         super();
+        this.prefix = prefix;
         this.bot = new DiscordBot();
         this.bot.once("ready", this.handleReady.bind(this));
         this.bot.on("message", this.handleMessage.bind(this));
@@ -150,7 +151,8 @@ export class RedditBot extends EventEmitter {
                         `I don't know ${args[1]}?`,
                         `**Please use one of the following variations:**\n` +
                             SUBREDDIT_MODES.map(
-                                (e) => `r/${subreddit} ${e} ${e === this.defaultMode ? "**(default)**" : ""}`
+                                (e) =>
+                                    `${this.prefix}${subreddit} ${e} ${e === this.defaultMode ? "**(default)**" : ""}`
                             ).join("\n")
                     )
                 );
