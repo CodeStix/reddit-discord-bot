@@ -35,6 +35,9 @@ export class RedditBot extends EventEmitter {
     public prefix: string;
     public defaultMode: SubredditMode = "week";
     public minUsageInterval: number = 1500;
+    public aliases: Record<string, string> = {
+        "5050": "fiftyfifty",
+    };
 
     private processingChannels: any = {};
     private bot: DiscordBot;
@@ -162,6 +165,8 @@ export class RedditBot extends EventEmitter {
             if (args[1] === "top") subredditMode = "week";
             else subredditMode = args[1] as SubredditMode;
         }
+
+        subreddit = this.aliases[subreddit] ?? subreddit;
 
         storePreviousInput(message.channel.id, message.author.id, raw);
 
