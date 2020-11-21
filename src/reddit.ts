@@ -242,7 +242,7 @@ export async function getRedditUserIcon(userName: string, cacheOnly: boolean = f
 
     try {
         let user = await fetchUser(userName);
-        await storeCachedRedditUserIcon(userName, user.icon_img);
+        await storeCachedRedditUserIcon(userName, user.icon_img ?? "");
         return user.icon_img;
     } catch (ex) {
         logger("could not get user icon for '%s':", userName, ex);
@@ -257,7 +257,7 @@ export async function getSubredditIcon(subredditName: string, cacheOnly: boolean
 
     try {
         let subreddit = await fetchSubreddit(subredditName);
-        await storeCachedSubredditIcon(subredditName, subreddit.icon_img);
+        await storeCachedSubredditIcon(subredditName, subreddit.icon_img ?? "");
         return subreddit.icon_img;
     } catch (ex) {
         logger("could not get subreddit icon for '%s':", subredditName, ex);
