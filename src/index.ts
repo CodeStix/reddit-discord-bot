@@ -109,7 +109,11 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     let descriptionBuilder = "";
     descriptionBuilder += numberToEmoijNumber(submission.score) + "\n";
     descriptionBuilder += truncateString(submission.selftext, TRUNCATE_DESCRIPTION_LENGTH);
-    if (cachedDetails && cachedDetails.comments) descriptionBuilder += createCommentSection(cachedDetails.comments);
+    let containsCommentSection = false;
+    if (cachedDetails && cachedDetails.comments) {
+        descriptionBuilder += createCommentSection(cachedDetails.comments);
+        containsCommentSection = true;
+    }
 
     let embed = new MessageEmbed()
         .setTitle(truncateString(submission.title, TRUNCATE_TITLE_LENGTH))
@@ -136,7 +140,7 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     if (embedTasks.length > 0) {
         await Promise.all(embedTasks as any);
 
-        if (cachedDetails && cachedDetails.comments) {
+        if (!containsCommentSection && cachedDetails && cachedDetails.comments) {
             descriptionBuilder += createCommentSection(cachedDetails.comments);
         } else {
             logger("cached details is null");
