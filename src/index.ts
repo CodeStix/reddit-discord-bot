@@ -31,7 +31,7 @@ const topgg = process.env.TOPGG_TOKEN ? new TopGGApi(process.env.TOPGG_TOKEN, bo
 const TRUNCATE_TITLE_LENGTH = 200; // Max is 256
 const TRUNCATE_COMMENTS_LENGTH = 1000; // MAX_COMMENTS_LENGTH + MAX_DESCRIPTION_LENGTH is max 2048
 const TRUNCATE_DESCRIPTION_LENGTH = 1000;
-const TRUNCATE_COMMENT_LENGTH = 200;
+const TRUNCATE_COMMENT_LENGTH = 400;
 const MAX_FILTER_TRIES = 35;
 const SKIP_DESCRIPTION_LENGTH = 400;
 const SKIP_MIN_POST_VOTES = 0;
@@ -110,8 +110,12 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     descriptionBuilder += numberToEmoijNumber(submission.score) + "\n";
     descriptionBuilder += truncateString(submission.selftext, TRUNCATE_DESCRIPTION_LENGTH);
     let containsCommentSection = false;
+    let commentSectionMaxThreadCount = urlIsAttachment ? 2 : 5;
     if (cachedDetails && cachedDetails.comments) {
-        descriptionBuilder += createCommentSection(cachedDetails.comments);
+        descriptionBuilder += truncateString(
+            createCommentSection(cachedDetails.comments, commentSectionMaxThreadCount),
+            TRUNCATE_COMMENTS_LENGTH
+        );
         containsCommentSection = true;
     }
 
@@ -141,7 +145,10 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
         await Promise.all(embedTasks as any);
 
         if (!containsCommentSection && cachedDetails && cachedDetails.comments) {
-            descriptionBuilder += createCommentSection(cachedDetails.comments);
+            descriptionBuilder += truncateString(
+                createCommentSection(cachedDetails.comments, commentSectionMaxThreadCount),
+                TRUNCATE_COMMENTS_LENGTH
+            );
         } else {
             logger("cached details is null");
         }
@@ -216,14 +223,22 @@ async function getNextMatchingSubmission(
     return [index, submission];
 }
 
-function createCommentSection(comments: Listing<Comment>): string {
+function createCommentSection(comments: Listing<Comment>, maxThreads: number = 3): string {
     let builder = "\n";
-    let currentComment = comments?.children.find((e) => !e.data.score_hidden)?.data;
-    let level = 0;
-    while (currentComment && currentComment.body) {
-        builder += createIndentedComment(currentComment, level++);
-        currentComment = currentComment.replies?.data?.children[0]?.data;
+    for (let i = 0, j = 0; j < maxThreads && i < comments?.children.length; i++) {
+        let comment = comments.children[i]?.data;
+        if (comment.score_hidden) continue;
+        // builder += "\n";
+
+        let level = 0;
+        while (comment && comment.body) {
+            builder += createIndentedComment(comment, level++);
+            comment = comment.replies?.data?.children[0]?.data;
+        }
+
+        j++;
     }
+
     return builder;
 }
 
@@ -343,7 +358,7 @@ function numberToEmoijNumber(num: number, small: boolean = false) {
 
 function createIndentedComment(comment: Comment, level: number) {
     let title = `**${numberToEmoijNumber(comment.score, true)}** __${comment.author}__`;
-    let body = truncateString(comment.body, TRUNCATE_COMMENT_LENGTH);
+    let body = truncateString(comment.body, TRUNCATE_COMMENT_LENGTH).replace(/\n/g, " ");
 
     if (level === 0) return "> " + title + "\n> " + body + "\n";
 
