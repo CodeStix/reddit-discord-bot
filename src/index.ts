@@ -206,19 +206,18 @@ async function getNextMatchingSubmission(
     let triesRemaining = MAX_FILTER_TRIES;
     let submission;
     do {
-        if (triesRemaining-- <= 0)
-            throw new RedditBotError(
-                "no-matching-posts",
-                `No posts match your filters. Try enabling NSFW to show more content.`
-            );
+        if (triesRemaining-- <= 0) throw new RedditBotError("no-matching-posts");
 
         submission = await getRedditSubmission(subreddit, subredditMode, index++);
 
-        if (!submission)
-            throw new RedditBotError(
-                "end-of-feed",
-                `You've reached the end of the **r/${subreddit}/${subredditMode}** subreddit. Come back later for new posts, or browse a different subreddit.`
-            );
+        if (!submission) {
+            if (index <= 2) throw new RedditBotError("subreddit-not-found");
+            else
+                throw new RedditBotError(
+                    "end-of-feed",
+                    `You've reached the end of the **r/${subreddit}/${subredditMode}** subreddit. Come back later for new posts, or browse a different subreddit.`
+                );
+        }
     } while (!matchesChannelFilters(channel, submission));
     return [index, submission];
 }
