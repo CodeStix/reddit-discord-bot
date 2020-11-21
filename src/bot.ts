@@ -13,6 +13,7 @@ import { SubredditMode, SUBREDDIT_MODES } from "./reddit";
 import { getVideoOrDownload } from "./video";
 import crypto from "crypto";
 import { getPreviousInput, storePreviousInput } from "./redis";
+import { createUnknownErrorEmbed, RedditBotError } from "./error";
 
 const logger = debug("rdb:bot");
 
@@ -206,7 +207,7 @@ export class RedditBot extends EventEmitter {
             await channel.send("", new MessageAttachment(url, name));
         } catch (ex) {
             logger("could not send as image, sending url instead:", ex);
-            await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
+            await channel.send(`⚠️ Could not upload to Discord, take a link instead: ${url}`);
         }
     }
 
@@ -217,8 +218,11 @@ export class RedditBot extends EventEmitter {
             let name = spoiler ? `SPOILER_${urlName}.mp4` : `video-${urlName}.mp4`;
             await channel.send("", new MessageAttachment(videoFile, name));
         } catch (ex) {
-            logger("could not send as video, sending url instead:", ex);
-            await channel.send(`⚠️ ${ex.message} Take a link instead: ${url}`);
+            if (ex instanceof RedditBotError) {
+                await channel.send(ex.createEmbed());
+            } else {
+                await channel.send(createUnknownErrorEmbed("Could not download video"));
+            }
         }
     }
 
