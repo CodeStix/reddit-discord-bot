@@ -163,6 +163,11 @@ export async function fetchSubmissions(
 ): Promise<Listing<Submission>> {
     let url;
     switch (mode) {
+        case "rising":
+        case "new":
+        case "random":
+            url = `${API_BASE}/r/${subreddit}/${mode}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all`;
+            break;
         case "hot":
             url = `${API_BASE}/r/${subreddit}/${mode}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&g=GLOBAL`;
             break;
