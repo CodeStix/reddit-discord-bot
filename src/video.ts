@@ -25,6 +25,10 @@ export function getVideoPath(url: string, maxVideoFileSize: number = DEFAULT_VID
     return path.join(VIDEO_CACHE_PATH, videoFileName);
 }
 
+export function isVideoDownloaded(url: string, maxVideoFileSize: number = DEFAULT_VIDEO_SIZE_LIMIT) {
+    return fs.existsSync(getVideoPath(url, maxVideoFileSize));
+}
+
 export async function getVideoOrDownload(
     url: string,
     maxVideoFileSize: number = DEFAULT_VIDEO_SIZE_LIMIT
@@ -46,8 +50,6 @@ export async function getVideoOrDownload(
 }
 
 export async function downloadVideo(url: string, path: string, maxVideoFileSize: number) {
-    if (fs.existsSync(path)) return path;
-
     // https://github.com/ytdl-org/youtube-dl/blob/master/README.md#format-selection
     // -4 flag: https://github.com/ytdl-org/youtube-dl/issues/19269
     let tempVideoFile = path + ".temp.mp4";

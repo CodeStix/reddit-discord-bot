@@ -95,13 +95,13 @@ export class RedditBot extends EventEmitter {
     }
 
     private async handleSubredditMessage(message: Message) {
-        let raw = message.content.substring(this.prefix.length).trim().toLowerCase();
-
+        logger("input '%s'", message.content);
         if (!this.rateLimit(message.channel.id)) {
-            logger("cancelled input '%s', rate limit", raw);
+            logger("cancelled input '%s', rate limit", message.content);
             return;
         }
 
+        let raw = message.content.substring(this.prefix.length).trim().toLowerCase();
         let permissions = message.guild!.me!.permissions;
         if (
             !permissions.has("ATTACH_FILES") ||
