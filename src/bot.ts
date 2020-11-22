@@ -33,7 +33,7 @@ const REDDIT_URL_REGEX = /^https?:\/\/(?:www\.)?reddit\.com\/(?:r\/(?<subredditN
 
 export class RedditBot extends EventEmitter {
     public prefix: string;
-    public defaultMode: SubredditMode = "week";
+    public defaultMode: SubredditMode = "hot";
     public minUsageInterval: number = 1500;
     public aliases: Record<string, string> = {
         "5050": "fiftyfifty",
@@ -107,19 +107,20 @@ export class RedditBot extends EventEmitter {
             !permissions.has("ATTACH_FILES") ||
             !permissions.has("EMBED_LINKS") ||
             !permissions.has("SEND_MESSAGES") ||
-            !permissions.has("ADD_REACTIONS")
+            !permissions.has("ADD_REACTIONS") ||
+            !permissions.has("MANAGE_MESSAGES")
         ) {
             logger("insufficient permissions for channel (%d)", message.channel.id);
             if (permissions.has("EMBED_LINKS")) {
                 message.channel.send(
                     this.createErrorEmbed(
                         "No Discord permissions",
-                        "You disabled my powers! Please allow me to **send messages**, **embed links**, **add reactions** and **attach files**."
+                        "You disabled my powers! Please allow me to **send messages**, **manage messages**, **embed links**, **add reactions** and **attach files**."
                     )
                 );
             } else {
                 message.channel.send(
-                    "You disabled my powers! Please allow me to **send messages**, **embed links**, **add reactions** and **attach files**."
+                    "You disabled my powers! Please allow me to **send messages**, **manage messages**, **embed links**, **add reactions** and **attach files**."
                 );
             }
             return;
@@ -162,7 +163,7 @@ export class RedditBot extends EventEmitter {
                 );
                 return;
             }
-            if (args[1] === "top") subredditMode = "week";
+            if (args[1] === "top") subredditMode = "month";
             else subredditMode = args[1] as SubredditMode;
         }
 
@@ -199,6 +200,9 @@ export class RedditBot extends EventEmitter {
         };
 
         super.emit("redditUrl", props);
+
+        // Remove default embed
+        setTimeout(() => message.suppressEmbeds(true), 100);
     }
 
     private getUrlName(url: string) {

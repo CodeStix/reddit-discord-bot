@@ -10,7 +10,7 @@ const VIDEO_CACHE_PATH = path.join(__dirname, "cache/videos");
 const FFMPEG_CACHE_PATH = path.join(__dirname, "cache/ffmpeg");
 const DEFAULT_VIDEO_SIZE_LIMIT = 1000 * 1000 * 8; // 8mb
 const MAX_VIDEO_DOWNLOAD_SIZE = 1000 * 1000 * 100; // 100mb
-const MAX_VIDEO_COMPRESS_LENGTH = 150; // Cut video to 150 seconds when compressing
+const MAX_VIDEO_COMPRESS_LENGTH = 110; // Cut video to 110 seconds when compressing
 const MAX_VIDEO_LENGTH = 60 * 4; // Skip compressing if larger 4 minutes
 
 const execAsync = util.promisify(exec);
@@ -89,7 +89,7 @@ export async function downloadVideo(url: string, path: string, maxVideoFileSize:
             MAX_VIDEO_COMPRESS_LENGTH
         );
         let targetAudioBitrate = 35000;
-        let targetFramerate = 24;
+        let targetFramerate = 20;
         let targetBitrate =
             (maxVideoFileSize * 8) / (Math.min(videoInfo.format.duration, MAX_VIDEO_COMPRESS_LENGTH) * 1.4) -
             targetAudioBitrate;
@@ -122,8 +122,10 @@ export async function compressVideo(
         let startTime = process.hrtime();
 
         let ffmpegCmd = `ffmpeg -y -i "${inputPath}" -c:v libx264 -strict -2 -passlogfile "${passLogPath}" -r ${targetFramerate} -tune fastdecode -preset ultrafast -t ${MAX_VIDEO_COMPRESS_LENGTH} -b:v ${targetBitrate} -pass 1 -an -f mp4 /dev/null`;
+        logger("execute ffmpeg pass0:", ffmpegCmd);
         await execAsync(ffmpegCmd);
         ffmpegCmd = `ffmpeg -y -i "${inputPath}" -c:v libx264 -strict -2 -passlogfile "${passLogPath}" -r ${targetFramerate} -tune fastdecode -preset ultrafast -t ${MAX_VIDEO_COMPRESS_LENGTH} -b:v ${targetBitrate} -pass 2 -c:a copy -b:a ${targetAudioBitrate} "${outputPath}"`;
+        logger("execute ffmpeg pass1:", ffmpegCmd);
         await execAsync(ffmpegCmd);
 
         let took = process.hrtime(startTime);
