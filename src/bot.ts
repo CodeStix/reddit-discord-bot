@@ -58,6 +58,12 @@ export class RedditBot extends EventEmitter {
 
     private handleReady() {
         logger("connected to discord");
+        setInterval(this.updatePresence.bind(this), 8 * 60 * 60 * 1000);
+        this.updatePresence();
+    }
+
+    private updatePresence() {
+        logger("setting presence");
         this.bot.user!.setPresence({ status: "online", activity: { type: "LISTENING", name: this.prefix } });
     }
 
