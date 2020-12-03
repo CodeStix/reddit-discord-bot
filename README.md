@@ -1,3 +1,7 @@
+<a href="https://top.gg/bot/711524405163065385">
+    <img src="https://top.gg/api/widget/711524405163065385.svg" alt="Reddit" />
+</a>
+
 # reddit-discord-bot
 
 An amazing Discord bot that connects with reddit. Has video playback support, NSFW (and 50/50) spoilers ...
