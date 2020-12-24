@@ -44,15 +44,3 @@ This bot is made with nodejs, ffmpeg, youtube-dl and redis.
 5. Store the current subreddit post index in the redis cache. (so the bot knows where to start looking for the next post)
 6. If video, use youtube-dl and ffmpeg to download and convert the video to mp4. If the video is larger than 8MB, compress the video using ffmpeg.
 7. Send the post in an embedded Discord message.
-
-## Host yourself
-
-To host this bot yourself, you have to...
-
-1. Clone this repository.
-2. Run the `install.sh` if you are on Linux. On Windows, you have to manually install youtube-dl, ffmpeg and redis. (make sure these are added to the PATH environment variable!)
-3. Register a new bot in the Discord developer portal and invite it to your Discord server.
-4. Populate the `.env` and `redis.conf` files. You will have to provide your Discord bot token here.
-5. Start the redis server with `redis-server redis.conf` (sudo if linux)
-6. Start the bot with `node src/index.js` (sudo if linux)
-7. Done! Try it in your server.
