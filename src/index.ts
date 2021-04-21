@@ -14,6 +14,7 @@ import {
     Listing,
     Submission,
     SubredditMode,
+    SUBREDDIT_MODES,
 } from "./reddit";
 import cheerio from "cheerio";
 import fetch from "node-fetch";
@@ -62,6 +63,23 @@ bot.on("redditRequest", async ({ subreddit, queryOrMode, channel, sender }: Subr
     logger("redditrequest", subreddit);
 
     let currentIndex = await getChannelIndex(channel.id, subreddit, queryOrMode);
+
+    if (currentIndex === 0) {
+        if (SUBREDDIT_MODES.includes(queryOrMode)) {
+            channel.send(
+                new MessageEmbed().setDescription(
+                    `You are browsing the **r/${subreddit}/${queryOrMode}** subreddit.\nUse \`${bot.prefix}/\` or repeat your input to get the next post.`
+                )
+            );
+        } else {
+            channel.send(
+                new MessageEmbed().setDescription(
+                    `You are searching the **r/${subreddit}** subreddit with '_${queryOrMode}_'.\nUse \`${bot.prefix}/\` or repeat your input to get the next search result.`
+                )
+            );
+        }
+    }
+
     let newIndex, submission;
     try {
         [newIndex, submission] = await getNextMatchingSubmission(subreddit, queryOrMode, currentIndex, channel);
@@ -87,7 +105,7 @@ bot.on("redditRequest", async ({ subreddit, queryOrMode, channel, sender }: Subr
         });
 
     await storeChannelIndex(channel.id, subreddit, queryOrMode, newIndex);
-    await sendRedditSubmission(channel, submission);
+    await sendRedditSubmission(channel, submission, queryOrMode);
 });
 
 bot.on("redditUrl", async (props: RedditUrlMessageHanlderProps) => {
@@ -107,12 +125,20 @@ bot.on("redditUrl", async (props: RedditUrlMessageHanlderProps) => {
     }
 });
 
-async function sendRedditSubmission(channel: TextChannel, submission: Submission) {
+async function sendRedditSubmission(channel: TextChannel, submission: Submission, queryOrMode?: string | SubredditMode) {
     let nsfw = submission.over_18 || submission.title.toLowerCase().includes("nsf");
     let asSpoiler = submission.spoiler || nsfw;
     let urlToSubmission = encodeURI("https://www.reddit.com" + submission.permalink);
     let urlToAuthor = encodeURI("https://www.reddit.com/u/" + submission.author);
     let urlIsAttachment = urlToSubmission !== submission.url;
+    let footerText = `On r/${submission.subreddit}`;
+    if (queryOrMode) {
+        if (SUBREDDIT_MODES.includes(queryOrMode)) {
+            footerText += `/${queryOrMode}`;
+        } else {
+            footerText += ` (searched '${queryOrMode}')`;
+        }
+    }
 
     let cachedUserIcon = await getRedditUserIcon(submission.author, true);
     let cachedSubredditInfo = await getSubredditInfo(submission.subreddit, true);
@@ -136,7 +162,7 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
         .setTimestamp(submission.created * 1000)
         .setDescription(descriptionBuilder)
         .setAuthor(submission.author, cachedUserIcon ?? getRandomDefaultUserIcon(), urlToAuthor)
-        .setFooter(`On r/${submission.subreddit}`, cachedSubredditInfo?.icon ?? undefined);
+        .setFooter(footerText, cachedSubredditInfo?.icon ?? undefined);
     let firstSentMessage = channel.send(embed);
 
     // Contains tasks that will edit the sent embed
@@ -163,7 +189,7 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
         embed.setDescription(descriptionBuilder);
         embed.setAuthor(submission.author, cachedUserIcon ?? getRandomDefaultUserIcon());
         embed.setColor(cachedSubredditInfo?.color ?? DEFAULT_EMBED_COLOR);
-        embed.setFooter(`On r/${submission.subreddit}`, cachedSubredditInfo?.icon ?? undefined);
+        embed.setFooter(footerText, cachedSubredditInfo?.icon ?? undefined);
 
         (await firstSentMessage).edit(embed);
     }
