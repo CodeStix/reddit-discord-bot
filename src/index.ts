@@ -37,12 +37,24 @@ const SKIP_DESCRIPTION_LENGTH = 400;
 const SKIP_MIN_POST_VOTES = 0;
 
 function matchesChannelFilters(channel: TextChannel, submission: Submission): boolean {
+    // Skip post if it is pinned/stickied
+    if (submission.stickied) {
+        return false;
+    }
+    // Skip if too mush text
+    if ((submission.selftext ?? "").length > SKIP_DESCRIPTION_LENGTH) {
+        return false;
+    }
+    // Skip if smaller than vote requirement
+    if (Math.abs(submission.score) < SKIP_MIN_POST_VOTES) {
+        return false;
+    }
+    // Skip if nsfw and it isn't allowed
     let allowNsfw = channel.nsfw;
-    return (
-        (allowNsfw || (!submission.title.toLowerCase().includes("nsf") && !submission.over_18)) &&
-        SKIP_DESCRIPTION_LENGTH > (submission.selftext ?? "").length &&
-        SKIP_MIN_POST_VOTES <= Math.abs(submission.score)
-    );
+    if (!allowNsfw && (submission.title.toLowerCase().includes("nsf") || submission.over_18)) {
+        return false;
+    }
+    return true;
 }
 
 bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: SubredditMessageHanlderProps) => {
@@ -112,10 +124,7 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     let containsCommentSection = false;
     let commentSectionMaxThreadCount = urlIsAttachment ? 2 : 5;
     if (cachedDetails && cachedDetails.comments) {
-        descriptionBuilder += truncateString(
-            createCommentSection(cachedDetails.comments, commentSectionMaxThreadCount),
-            TRUNCATE_COMMENTS_LENGTH
-        );
+        descriptionBuilder += truncateString(createCommentSection(cachedDetails.comments, commentSectionMaxThreadCount), TRUNCATE_COMMENTS_LENGTH);
         containsCommentSection = true;
     }
 
@@ -131,15 +140,12 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
 
     // Contains tasks that will edit the sent embed
     let embedTasks = [];
-    if (cachedUserIcon === null)
-        embedTasks.push(getRedditUserIcon(submission.author).then((e) => (cachedUserIcon = e)));
-    if (cachedSubredditIcon === null)
-        embedTasks.push(getSubredditIcon(submission.subreddit).then((e) => (cachedSubredditIcon = e)));
+    if (cachedUserIcon === null) embedTasks.push(getRedditUserIcon(submission.author).then((e) => (cachedUserIcon = e)));
+    if (cachedSubredditIcon === null) embedTasks.push(getSubredditIcon(submission.subreddit).then((e) => (cachedSubredditIcon = e)));
     if (cachedDetails === null) embedTasks.push(getSubmission(submission.id).then((e) => (cachedDetails = e)));
 
     let otherTasks = [];
-    if (urlIsAttachment && cachedAttachment === null)
-        otherTasks.push(getUnpackedUrl(submission.url).then((e) => (cachedAttachment = e)));
+    if (urlIsAttachment && cachedAttachment === null) otherTasks.push(getUnpackedUrl(submission.url).then((e) => (cachedAttachment = e)));
 
     if (embedTasks.length > 0) {
         await Promise.all(embedTasks as any);
@@ -256,12 +262,7 @@ async function getUnpackedUrl(url: string, cacheOnly: boolean = false): Promise<
  * @param {string} url The url to unpack/resolve.
  */
 async function unpackUrl(url: string): Promise<string> {
-    if (
-        url.startsWith("https://5050") ||
-        url.startsWith("http://5050") ||
-        url.startsWith("http://bit.ly") ||
-        url.startsWith("https://bit.ly")
-    ) {
+    if (url.startsWith("https://5050") || url.startsWith("http://5050") || url.startsWith("http://bit.ly") || url.startsWith("https://bit.ly")) {
         try {
             let res = await fetch(url, { redirect: "follow", method: "HEAD" });
             url = res.url;

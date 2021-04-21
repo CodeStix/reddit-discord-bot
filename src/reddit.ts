@@ -20,18 +20,7 @@ const API_BASE = "https://api.reddit.com";
 const DEFAULT_COMMENT_SORT = "top";
 
 export type CommentSortMode = "confidence" | "top" | "new" | "controversial" | "old" | "random";
-export type SubredditMode =
-    | "hot"
-    | "new"
-    | "random"
-    | "rising"
-    | "hour"
-    | "day"
-    | "week"
-    | "month"
-    | "year"
-    | "all"
-    | "top"; // "hour" | "day" | "month" | "week" | "year" | "all" are top
+export type SubredditMode = "hot" | "new" | "random" | "rising" | "hour" | "day" | "week" | "month" | "year" | "all" | "top"; // "hour" | "day" | "month" | "week" | "year" | "all" are top
 export const SUBREDDIT_MODES = ["hot", "new", "random", "rising", "hour", "day", "week", "month", "year", "all", "top"];
 
 export type RedditFetchErrorType = "not-found" | "private" | "banned" | "unknown";
@@ -39,6 +28,7 @@ export type RedditFetchErrorType = "not-found" | "private" | "banned" | "unknown
 // Do not rename these fields! They come directly from the reddit API
 export interface Submission {
     id: string;
+    stickied: boolean;
     author: string;
     selftext: string;
     created: number;
@@ -156,11 +146,7 @@ async function fetchJson(url: string): Promise<any> {
     }
 }
 
-export async function fetchSubmissions(
-    subreddit: string,
-    mode: SubredditMode,
-    after?: string
-): Promise<Listing<Submission>> {
+export async function fetchSubmissions(subreddit: string, mode: SubredditMode, after?: string): Promise<Listing<Submission>> {
     let url;
     switch (mode) {
         case "rising":
@@ -208,11 +194,7 @@ export async function fetchSubreddit(subredditName: string): Promise<Subreddit> 
     return res.data as Subreddit;
 }
 
-export async function getRedditSubmission(
-    subreddit: string,
-    subredditMode: SubredditMode,
-    index: number
-): Promise<Submission | null> {
+export async function getRedditSubmission(subreddit: string, subredditMode: SubredditMode, index: number): Promise<Submission | null> {
     let page = Math.floor(index / CACHE_PER_PAGE);
     let num = Math.floor(index % CACHE_PER_PAGE);
 
@@ -284,6 +266,7 @@ export async function getSubmission(
     commentSortMode: CommentSortMode = DEFAULT_COMMENT_SORT
 ): Promise<Submission | null> {
     let submission = await getCachedSubmission(submissionId, commentSortMode);
+    fs.writeFileSync("logs/output.json", JSON.stringify(submission));
     if (submission !== null) return submission;
     if (cacheOnly) return null;
 
