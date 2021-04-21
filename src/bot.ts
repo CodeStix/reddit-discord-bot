@@ -22,6 +22,7 @@ export interface RedditUrlMessageHanlderProps {
 }
 
 const REDDIT_URL_REGEX = /^https?:\/\/(?:www\.)?reddit\.com\/(?:r\/(?<subredditName>[\w\d]+)\/)?comments\/(?<submissionId>[\w\d]+)/i;
+const EXAMPLE_SUBREDDITS = ["memes", "pics", "dankmemes", "videos", "dankvideos"];
 
 export class RedditBot extends EventEmitter {
     public prefix: string;
@@ -67,18 +68,21 @@ export class RedditBot extends EventEmitter {
     }
 
     private createHelpEmbed() {
+        let subreddit = EXAMPLE_SUBREDDITS[Math.floor(Math.random() * EXAMPLE_SUBREDDITS.length)];
         return new MessageEmbed().setTitle("Reddit Bot Help").setColor("#FF4301").setDescription(`
             **You can use the \`${this.prefix}\` prefix in the following ways:**
 
-            - \`${this.prefix}pics\`: shows a top post from the r/pics subreddit.
+            🔥 \u00A0 **\`${this.prefix}${subreddit}\`**: shows a hot post from the r/${subreddit} subreddit.
 
-            - \`${this.prefix}pics new\`: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
+            🔍 \u00A0 **\`${this.prefix}${subreddit} minecraft\`**: searches for posts in the r/${subreddit} subreddit containing 'minecraft'.
 
-            - \`${this.prefix}pics week\`: shows a top post from the last week. You can also use **hour**, **day**, **week**, **month**, **year** and **all**.
+            🆕 \u00A0 **\`${this.prefix}${subreddit} new\`**: shows a new post. You can also use **top**, **best**, **rising** and **hot**.
 
-            - \`${this.prefix}/\`: repeat your previous input.
+            🕐 \u00A0 **\`${this.prefix}${subreddit} week\`**: shows a top post from the last week. You can also use **hour**, **day**, **week**, **month**, **year** and **all**.
 
-            You can also paste a reddit url, I will convert it into a nice styled message.
+            🔁 \u00A0 **\`${this.prefix}/\`**: repeat your previous input.
+
+            **You can also paste a reddit url, I will convert it into a nice styled message.**
 
             ❤️ Thanks for using this bot! If you like it, you should consider [voting](https://top.gg/bot/711524405163065385).
 

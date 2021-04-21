@@ -255,9 +255,9 @@ export async function getSubredditInfo(subredditName: string, cacheOnly: boolean
     try {
         let subreddit = await fetchSubreddit(subredditName);
         await storeCachedSubredditIcon(subredditName, subreddit.icon_img ?? "");
-        await storeCachedSubredditColor(subredditName, subreddit.key_color ?? "");
+        await storeCachedSubredditColor(subredditName, subreddit.primary_color ?? "");
         return {
-            color: subreddit.key_color,
+            color: subreddit.primary_color,
             icon: subreddit.icon_img,
         };
     } catch (ex) {
