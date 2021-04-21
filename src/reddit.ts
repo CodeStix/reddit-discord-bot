@@ -150,29 +150,31 @@ async function fetchJson(url: string): Promise<any> {
     }
 }
 
-export async function fetchSubmissions(subreddit: string, mode: SubredditMode, after?: string): Promise<Listing<Submission>> {
+export async function fetchSubmissions(subreddit: string, query: SubredditMode | string, after?: string): Promise<Listing<Submission>> {
     let url;
-    switch (mode) {
+    switch (query.trim().toLowerCase()) {
         case "rising":
         case "new":
         case "random":
-            url = `${API_BASE}/r/${subreddit}/${mode}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all`;
+            url = `${API_BASE}/r/${subreddit}/${query}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all`;
             break;
         case "hot":
-            url = `${API_BASE}/r/${subreddit}/${mode}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&g=GLOBAL`;
+        case "":
+            url = `${API_BASE}/r/${subreddit}/${query}?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&g=GLOBAL`;
             break;
         case "top":
-            mode = "month";
+            query = "month";
         case "hour":
         case "day":
         case "week":
         case "month":
         case "year":
         case "all":
-            url = `${API_BASE}/r/${subreddit}/top?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&t=${mode}`;
+            url = `${API_BASE}/r/${subreddit}/top?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&t=${query}`;
             break;
         default:
-            throw new Error(`Invalid mode '${mode}' was passed to fetchSubmissions`);
+            url = `${API_BASE}/r/${subreddit}/search?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&q=${query}`;
+            break;
     }
 
     if (after) url += `&after=${after}`;
@@ -198,23 +200,23 @@ export async function fetchSubreddit(subredditName: string): Promise<Subreddit> 
     return res.data as Subreddit;
 }
 
-export async function getRedditSubmission(subreddit: string, subredditMode: SubredditMode, index: number): Promise<Submission | null> {
+export async function getRedditSubmission(subreddit: string, query: SubredditMode | string, index: number): Promise<Submission | null> {
     let page = Math.floor(index / CACHE_PER_PAGE);
     let num = Math.floor(index % CACHE_PER_PAGE);
 
-    let listing = await getCachedRedditListing(subreddit, subredditMode, page);
+    let listing = await getCachedRedditListing(subreddit, query, page);
     if (listing === null) {
         // Listing does not exist in cache, request it and store it in the cache
         let previousListing = null;
-        if (page > 0) previousListing = await getCachedRedditListing(subreddit, subredditMode, page - 1);
+        if (page > 0) previousListing = await getCachedRedditListing(subreddit, query, page - 1);
 
-        listing = await fetchSubmissions(subreddit, subredditMode, previousListing?.after);
+        listing = await fetchSubmissions(subreddit, query, previousListing?.after);
         if (listing.children.length === 0) throw new RedditBotError("subreddit-not-found");
-        await storeCachedRedditListing(subreddit, subredditMode, page, listing);
+        await storeCachedRedditListing(subreddit, query, page, listing);
     }
 
     if (listing.children.length <= num) {
-        logger("index %d is out of range of listing %s/%s", index, subreddit, subredditMode);
+        logger("index %d is out of range of listing %s/%s", index, subreddit, query);
         return null;
     }
 
@@ -287,3 +289,5 @@ export async function getSubmission(
     await storeCachedSubmission(submission, commentSortMode);
     return submission;
 }
+
+export async function searchSubreddit() {}

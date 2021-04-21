@@ -27,8 +27,8 @@ const EXPIRE_URL = 60 * 60 * 24 * 15;
 const EXPIRE_USER_INPUT = 60 * 60 * 24 * 30;
 const EXPIRE_SUBMISSION = 60 * 60 * 24 * 5;
 
-function getTtlForRedditMode(mode: SubredditMode) {
-    switch (mode) {
+function getTtlForRedditMode(queryOrMode: SubredditMode | string) {
+    switch (queryOrMode) {
         case "hour":
             return 60 * 60;
         case "day":
@@ -40,18 +40,40 @@ function getTtlForRedditMode(mode: SubredditMode) {
         case "year":
         case "all":
             return 60 * 60 * 24 * 30 * 3; // will probably forget after 3 months
-        default:
+        case "hot":
+        case "rising":
+        case "random":
+        case "top":
             return 60 * 60 * 16;
+        default:
+            return 60 * 60 * 8;
     }
 }
 
-export async function storeCachedRedditListing(subreddit: string, subredditMode: SubredditMode, page: number, submissions: Listing<Submission>) {
-    logger("caching listing page %d %s/%s (%d items)", page, subreddit, subredditMode, submissions.children.length);
-    await setExAsync(`reddit:${subreddit}:${subredditMode}:${page}`, getTtlForRedditMode(subredditMode), JSON.stringify(submissions));
+function cleanQuery(query: string) {
+    return query
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
 }
 
-export async function getCachedRedditListing(subreddit: string, subredditMode: SubredditMode, page: number): Promise<Listing<Submission> | null> {
-    return JSON.parse((await getAsync(`reddit:${subreddit}:${subredditMode}:${page}`)) ?? "null");
+export async function storeCachedRedditListing(
+    subreddit: string,
+    queryOrMode: SubredditMode | string,
+    page: number,
+    submissions: Listing<Submission>
+) {
+    queryOrMode = cleanQuery(queryOrMode);
+    logger("caching listing page %d %s/%s (%d items)", page, subreddit, queryOrMode, submissions.children.length);
+    await setExAsync(`reddit:${subreddit}:${queryOrMode}:${page}`, getTtlForRedditMode(queryOrMode), JSON.stringify(submissions));
+}
+
+export async function getCachedRedditListing(
+    subreddit: string,
+    queryOrMode: SubredditMode | string,
+    page: number
+): Promise<Listing<Submission> | null> {
+    return JSON.parse((await getAsync(`reddit:${subreddit}:${cleanQuery(queryOrMode)}:${page}`)) ?? "null");
 }
 
 export async function getCachedRedditUserIcon(userName: string): Promise<string | null> {
@@ -87,12 +109,13 @@ export async function storeCachedPackedUrl(url: string, unpackedUrl: string) {
     await setExAsync(`url:${url}`, EXPIRE_URL, unpackedUrl);
 }
 
-export async function getChannelIndex(channelId: string, subreddit: string, subredditMode: SubredditMode): Promise<number> {
-    return parseInt((await getAsync(`channel:${channelId}:${subreddit}:${subredditMode}:index`)) ?? "0");
+export async function getChannelIndex(channelId: string, subreddit: string, queryOrMode: SubredditMode | string): Promise<number> {
+    return parseInt((await getAsync(`channel:${channelId}:${subreddit}:${cleanQuery(queryOrMode)}:index`)) ?? "0");
 }
 
-export async function storeChannelIndex(channelId: string, subreddit: string, subredditMode: SubredditMode, index: number) {
-    await setExAsync(`channel:${channelId}:${subreddit}:${subredditMode}:index`, getTtlForRedditMode(subredditMode), "" + index);
+export async function storeChannelIndex(channelId: string, subreddit: string, queryOrMode: SubredditMode | string, index: number) {
+    queryOrMode = cleanQuery(queryOrMode);
+    await setExAsync(`channel:${channelId}:${subreddit}:${queryOrMode}:index`, getTtlForRedditMode(queryOrMode), "" + index);
 }
 
 export async function storePreviousInput(channelId: string, userId: string, input: string) {

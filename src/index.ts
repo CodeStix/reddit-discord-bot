@@ -58,13 +58,13 @@ function matchesChannelFilters(channel: TextChannel, submission: Submission): bo
     return true;
 }
 
-bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: SubredditMessageHanlderProps) => {
+bot.on("redditRequest", async ({ subreddit, queryOrMode, channel, sender }: SubredditMessageHanlderProps) => {
     logger("redditrequest", subreddit);
 
-    let currentIndex = await getChannelIndex(channel.id, subreddit, subredditMode);
+    let currentIndex = await getChannelIndex(channel.id, subreddit, queryOrMode);
     let newIndex, submission;
     try {
-        [newIndex, submission] = await getNextMatchingSubmission(subreddit, subredditMode, currentIndex, channel);
+        [newIndex, submission] = await getNextMatchingSubmission(subreddit, queryOrMode, currentIndex, channel);
     } catch (ex) {
         if (ex instanceof RedditBotError) {
             logger("bot error (%s): %s", ex.type, ex.message);
@@ -76,7 +76,7 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
         return;
     }
 
-    getNextMatchingSubmission(subreddit, subredditMode, newIndex, channel)
+    getNextMatchingSubmission(subreddit, queryOrMode, newIndex, channel)
         .then(([, nextSubmission]) => {
             if (!nextSubmission) return;
             logger("preload %s", nextSubmission.permalink);
@@ -86,7 +86,7 @@ bot.on("redditRequest", async ({ subreddit, subredditMode, channel, sender }: Su
             logger("could not cache next submission:", err);
         });
 
-    await storeChannelIndex(channel.id, subreddit, subredditMode, newIndex);
+    await storeChannelIndex(channel.id, subreddit, queryOrMode, newIndex);
     await sendRedditSubmission(channel, submission);
 });
 
@@ -207,7 +207,7 @@ async function preloadSubmission(submission: Submission) {
 
 async function getNextMatchingSubmission(
     subreddit: string,
-    subredditMode: SubredditMode,
+    queryOrMode: SubredditMode | string,
     index: number,
     channel: TextChannel
 ): Promise<[number, Submission]> {
@@ -216,14 +216,14 @@ async function getNextMatchingSubmission(
     do {
         if (triesRemaining-- <= 0) throw new RedditBotError("no-matching-posts");
 
-        submission = await getRedditSubmission(subreddit, subredditMode, index++);
+        submission = await getRedditSubmission(subreddit, queryOrMode, index++);
 
         if (!submission) {
             if (index <= 2) throw new RedditBotError("subreddit-not-found");
             else
                 throw new RedditBotError(
                     "end-of-feed",
-                    `You've reached the end of the **r/${subreddit}/${subredditMode}** subreddit. Come back later for new posts, or browse a different subreddit.`
+                    `You've reached the end of the **r/${subreddit}/${queryOrMode}** subreddit. Come back later for new posts, or browse a different subreddit.`
                 );
         }
     } while (!matchesChannelFilters(channel, submission));

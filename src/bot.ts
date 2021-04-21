@@ -13,7 +13,7 @@ export interface SubredditMessageHanlderProps {
     channel: TextChannel;
     sender: User;
     subreddit: string;
-    subredditMode: SubredditMode;
+    queryOrMode: SubredditMode | string;
 }
 export interface RedditUrlMessageHanlderProps {
     channel: TextChannel;
@@ -29,6 +29,7 @@ export class RedditBot extends EventEmitter {
     public minUsageInterval: number = 1500;
     public aliases: Record<string, string> = {
         "5050": "fiftyfifty",
+        mc: "minecraft",
     };
 
     private processingChannels: any = {};
@@ -165,7 +166,7 @@ export class RedditBot extends EventEmitter {
             channel: message.channel as TextChannel,
             sender: message.author,
             subreddit: subreddit,
-            subredditMode: subredditMode,
+            queryOrMode: subredditMode,
         };
 
         super.emit("redditRequest", props);
