@@ -2,10 +2,12 @@ import {
     getCachedRedditListing,
     getCachedRedditUserIcon,
     getCachedSubmission,
+    getCachedSubredditColor,
     getCachedSubredditIcon,
     storeCachedRedditListing,
     storeCachedRedditUserIcon,
     storeCachedSubmission,
+    storeCachedSubredditColor,
     storeCachedSubredditIcon,
 } from "./redis";
 import { debug } from "debug";
@@ -51,6 +53,8 @@ export interface RedditUser {
 export interface Subreddit {
     name: string;
     icon_img: string;
+    key_color: string;
+    primary_color: string;
 }
 
 export interface Listing<T> {
@@ -232,15 +236,24 @@ export async function getRedditUserIcon(userName: string, cacheOnly: boolean = f
     }
 }
 
-export async function getSubredditIcon(subredditName: string, cacheOnly: boolean = false): Promise<string | null> {
+export async function getSubredditInfo(subredditName: string, cacheOnly: boolean = false): Promise<{ color: string; icon: string } | null> {
     let subredditIcon = await getCachedSubredditIcon(subredditName);
-    if (subredditIcon !== null) return subredditIcon;
+    let subredditColor = await getCachedSubredditColor(subredditName);
+    if (subredditIcon !== null && subredditColor !== null)
+        return {
+            icon: subredditIcon,
+            color: subredditColor,
+        };
     if (cacheOnly) return null;
 
     try {
         let subreddit = await fetchSubreddit(subredditName);
         await storeCachedSubredditIcon(subredditName, subreddit.icon_img ?? "");
-        return subreddit.icon_img;
+        await storeCachedSubredditColor(subredditName, subreddit.key_color ?? "");
+        return {
+            color: subreddit.key_color,
+            icon: subreddit.icon_img,
+        };
     } catch (ex) {
         logger("could not get subreddit icon for '%s':", subredditName, ex);
         return null;

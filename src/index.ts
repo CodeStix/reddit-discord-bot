@@ -10,7 +10,7 @@ import {
     getRedditSubmission,
     getRedditUserIcon,
     getSubmission,
-    getSubredditIcon,
+    getSubredditInfo,
     Listing,
     Submission,
     SubredditMode,
@@ -28,6 +28,7 @@ const logger = debug("rdb");
 const bot = new RedditBot(process.env.DISCORD_TOKEN!, process.env.PREFIX ?? "r/");
 const topgg = process.env.TOPGG_TOKEN ? new TopGGApi(process.env.TOPGG_TOKEN, bot.getBot()) : null;
 
+const DEFAULT_EMBED_COLOR = "#2f3136"; // 55ff11
 const TRUNCATE_TITLE_LENGTH = 200; // Max is 256
 const TRUNCATE_COMMENTS_LENGTH = 1000; // MAX_COMMENTS_LENGTH + MAX_DESCRIPTION_LENGTH is max 2048
 const TRUNCATE_DESCRIPTION_LENGTH = 1000;
@@ -114,7 +115,7 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     let urlIsAttachment = urlToSubmission !== submission.url;
 
     let cachedUserIcon = await getRedditUserIcon(submission.author, true);
-    let cachedSubredditIcon = await getSubredditIcon(submission.subreddit, true);
+    let cachedSubredditInfo = await getSubredditInfo(submission.subreddit, true);
     let cachedAttachment = urlIsAttachment ? await getUnpackedUrl(submission.url, true) : null;
     let cachedDetails = await getSubmission(submission.id, true, 3);
 
@@ -131,17 +132,17 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     let embed = new MessageEmbed()
         .setTitle(truncateString(submission.title, TRUNCATE_TITLE_LENGTH))
         .setURL(urlToSubmission)
-        .setColor(nsfw ? "#ff1111" : "#11ff11")
+        .setColor(cachedSubredditInfo?.color ?? DEFAULT_EMBED_COLOR)
         .setTimestamp(submission.created * 1000)
         .setDescription(descriptionBuilder)
         .setAuthor(submission.author, cachedUserIcon ?? getRandomDefaultUserIcon(), urlToAuthor)
-        .setFooter(`On r/${submission.subreddit}`, cachedSubredditIcon ?? undefined);
+        .setFooter(`On r/${submission.subreddit}`, cachedSubredditInfo?.icon ?? undefined);
     let firstSentMessage = channel.send(embed);
 
     // Contains tasks that will edit the sent embed
     let embedTasks = [];
     if (cachedUserIcon === null) embedTasks.push(getRedditUserIcon(submission.author).then((e) => (cachedUserIcon = e)));
-    if (cachedSubredditIcon === null) embedTasks.push(getSubredditIcon(submission.subreddit).then((e) => (cachedSubredditIcon = e)));
+    if (cachedSubredditInfo === null) embedTasks.push(getSubredditInfo(submission.subreddit).then((e) => (cachedSubredditInfo = e)));
     if (cachedDetails === null) embedTasks.push(getSubmission(submission.id).then((e) => (cachedDetails = e)));
 
     let otherTasks = [];
@@ -161,7 +162,8 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
 
         embed.setDescription(descriptionBuilder);
         embed.setAuthor(submission.author, cachedUserIcon ?? getRandomDefaultUserIcon());
-        embed.setFooter(`On r/${submission.subreddit}`, cachedSubredditIcon ?? undefined);
+        embed.setColor(cachedSubredditInfo?.color ?? DEFAULT_EMBED_COLOR);
+        embed.setFooter(`On r/${submission.subreddit}`, cachedSubredditInfo?.icon ?? undefined);
 
         (await firstSentMessage).edit(embed);
     }
@@ -192,7 +194,7 @@ async function preloadSubmission(submission: Submission) {
 
     let tasks = [];
     tasks.push(getRedditUserIcon(submission.author));
-    tasks.push(getSubredditIcon(submission.subreddit));
+    tasks.push(getSubredditInfo(submission.subreddit));
     tasks.push(getSubmission(submission.id, false, 3));
     if (urlIsAttachment) tasks.push(getUnpackedUrl(submission.url).then(preloadAttachment));
 

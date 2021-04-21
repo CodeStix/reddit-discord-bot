@@ -1,12 +1,4 @@
-import {
-    Client as DiscordBot,
-    Message,
-    MessageAttachment,
-    MessageEmbed,
-    MessageFlags,
-    TextChannel,
-    User,
-} from "discord.js";
+import { Client as DiscordBot, Message, MessageAttachment, MessageEmbed, MessageFlags, TextChannel, User } from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
 import { SubredditMode, SUBREDDIT_MODES } from "./reddit";
@@ -58,12 +50,12 @@ export class RedditBot extends EventEmitter {
 
     private handleReady() {
         logger("connected to discord");
-        setInterval(this.updatePresence.bind(this), 8 * 60 * 60 * 1000);
+        setInterval(this.updatePresence.bind(this), 4 * 60 * 60 * 1000);
         this.updatePresence();
     }
 
     private updatePresence() {
-        logger("setting presence");
+        logger("updating presence");
         this.bot.user!.setPresence({ status: "online", activity: { type: "LISTENING", name: this.prefix } });
     }
 
@@ -139,12 +131,7 @@ export class RedditBot extends EventEmitter {
             // Repeat previous input
             let previous = await getPreviousInput(message.channel.id, message.author.id);
             if (!previous) {
-                message.channel.send(
-                    this.createWarningEmbed(
-                        "I don't remember",
-                        "I don't remember your previous input, please type it yourself."
-                    )
-                );
+                message.channel.send(this.createWarningEmbed("I don't remember", "I don't remember your previous input, please type it yourself."));
                 return;
             }
             raw = previous;
@@ -161,10 +148,7 @@ export class RedditBot extends EventEmitter {
                     this.createWarningEmbed(
                         `I don't know ${args[1]}?`,
                         `**Please use one of the following variations:**\n` +
-                            SUBREDDIT_MODES.map(
-                                (e) =>
-                                    `${this.prefix}${subreddit} ${e} ${e === this.defaultMode ? "**(default)**" : ""}`
-                            ).join("\n")
+                            SUBREDDIT_MODES.map((e) => `${this.prefix}${subreddit} ${e} ${e === this.defaultMode ? "**(default)**" : ""}`).join("\n")
                     )
                 );
                 return;
