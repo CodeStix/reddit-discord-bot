@@ -273,6 +273,13 @@ async function unpackUrl(url: string): Promise<string> {
         }
     }
 
+    if (url.startsWith("https://www.reddit.com/gallery/") || url.startsWith("https://reddit.com/gallery/")) {
+        let res = await (await fetch(url, { redirect: "follow" })).buffer();
+        let ch = cheerio.load(res);
+        let elem = ch("figure img");
+        if (elem) url = elem.attr("src") ?? url;
+    }
+
     if (url.startsWith("https://imgur.com/gallery/")) {
         url = "https://imgur.com/a/" + url.substring("https://imgur.com/gallery/".length);
     }
@@ -306,6 +313,11 @@ async function unpackUrl(url: string): Promise<string> {
 }
 
 function isImageUrl(url: string): boolean {
+    // Remove query string
+    let i = url.indexOf("?");
+    if (i > 0) {
+        url = url.substring(0, i);
+    }
     return (
         url.endsWith(".gif") ||
         url.endsWith(".png") ||
@@ -316,6 +328,11 @@ function isImageUrl(url: string): boolean {
 }
 
 function isVideoUrl(url: string): boolean {
+    // Remove query string
+    let i = url.indexOf("?");
+    if (i > 0) {
+        url = url.substring(0, i);
+    }
     return (
         url.endsWith(".gif") ||
         url.endsWith(".gifv") ||
