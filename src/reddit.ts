@@ -254,10 +254,11 @@ export async function getSubredditInfo(subredditName: string, cacheOnly: boolean
 
     try {
         let subreddit = await fetchSubreddit(subredditName);
+        let color = subreddit.primary_color || subreddit.key_color || "#11ff11";
         await storeCachedSubredditIcon(subredditName, subreddit.icon_img ?? "");
-        await storeCachedSubredditColor(subredditName, subreddit.primary_color ?? "");
+        await storeCachedSubredditColor(subredditName, color);
         return {
-            color: subreddit.primary_color,
+            color: color,
             icon: subreddit.icon_img,
         };
     } catch (ex) {
@@ -285,7 +286,6 @@ export async function getSubmission(
     commentSortMode: CommentSortMode = DEFAULT_COMMENT_SORT
 ): Promise<Submission | null> {
     let submission = await getCachedSubmission(submissionId, commentSortMode);
-    fs.writeFileSync("logs/output.json", JSON.stringify(submission));
     if (submission !== null) return submission;
     if (cacheOnly) return null;
 
