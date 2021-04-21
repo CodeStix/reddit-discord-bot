@@ -173,11 +173,15 @@ export async function fetchSubmissions(subreddit: string, query: SubredditMode |
             url = `${API_BASE}/r/${subreddit}/top?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&t=${query}`;
             break;
         default:
-            url = `${API_BASE}/r/${subreddit}/search?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&q=${query}`;
+            url = `${API_BASE}/r/${subreddit}/search?count=${CACHE_PER_PAGE}&limit=${CACHE_PER_PAGE}&show=all&restrict_sr=true&q=${encodeURIComponent(
+                query
+            )}`;
             break;
     }
 
     if (after) url += `&after=${after}`;
+
+    console.log("url", url);
 
     return parseListing<Submission>(await fetchJson(url));
 }

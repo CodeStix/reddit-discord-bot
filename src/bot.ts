@@ -61,7 +61,7 @@ export class RedditBot extends EventEmitter {
     }
 
     private handleMessage(message: Message) {
-        if (message.channel.type !== "text") return;
+        if (message.channel.type !== "text" || message.author.bot) return;
         if (message.content.startsWith(this.prefix)) this.handleSubredditMessage(message);
         else if (message.content.startsWith("https://www.reddit.com/r/")) this.handleRedditUrlMessage(message);
     }
@@ -140,22 +140,11 @@ export class RedditBot extends EventEmitter {
 
         let args = raw.split(/ |,|:|\//g);
         let subreddit = args[0];
-        let subredditMode: SubredditMode = this.defaultMode;
+        let queryOrMode: SubredditMode | string = args.slice(1).join(" ").trim() || this.defaultMode;
 
-        if (args.length > 1) {
-            if (!SUBREDDIT_MODES.includes(args[1])) {
-                logger("user entered wrong subreddit mode %s", args[1]);
-                message.channel.send(
-                    this.createWarningEmbed(
-                        `I don't know ${args[1]}?`,
-                        `**Please use one of the following variations:**\n` +
-                            SUBREDDIT_MODES.map((e) => `${this.prefix}${subreddit} ${e} ${e === this.defaultMode ? "**(default)**" : ""}`).join("\n")
-                    )
-                );
-                return;
-            }
-            if (args[1] === "top") subredditMode = "month";
-            else subredditMode = args[1] as SubredditMode;
+        if (queryOrMode.length > 30) {
+            message.channel.send(this.createWarningEmbed("Please use a shorter search text.", ""));
+            return;
         }
 
         subreddit = this.aliases[subreddit] ?? subreddit;
@@ -166,7 +155,7 @@ export class RedditBot extends EventEmitter {
             channel: message.channel as TextChannel,
             sender: message.author,
             subreddit: subreddit,
-            queryOrMode: subredditMode,
+            queryOrMode: queryOrMode,
         };
 
         super.emit("redditRequest", props);
