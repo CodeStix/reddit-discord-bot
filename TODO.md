@@ -1,0 +1,1 @@
+- alias okbr -> okbuddyretard
