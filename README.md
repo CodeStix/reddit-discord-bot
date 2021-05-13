@@ -1,16 +1,13 @@
-<a href="https://top.gg/bot/711524405163065385">
-    <img src="https://top.gg/api/widget/711524405163065385.svg" alt="Reddit" />
-</a>
-
 # reddit-discord-bot
 
-An amazing Discord bot that connects with reddit. Has video playback support, NSFW (and 50/50) spoilers ...
+Browse Reddit using this Discord bot! It downloads video posts, leaves r/5050 images unspoiled and shows a comment section preview.
 
-![preview](https://i.imgur.com/rvo6bwx.gif)
+![preview](https://github.com/CodeStix/reddit-discord-bot/raw/master2/images/videopreview.gif)
 
-### Invite by clicking [here](https://discord.com/oauth2/authorize?client_id=711524405163065385&scope=bot&permissions=326720).
-
-
+<a href="https://top.gg/bot/711524405163065385">
+    <img src="https://top.gg/api/widget/711524405163065385.svg" alt="Reddit" />
+    <p>Click here to invite</p>
+</a>
 
 ## Usage
 
@@ -22,13 +19,11 @@ An amazing Discord bot that connects with reddit. Has video playback support, NS
 
 **To enable NSFW reddit content (e.g. r/fiftyfifty), you **MUST** mark the Discord channel as NSFW.**
 
-![bot prefix usage](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditprefix.png)
+## Reddit urls
 
-## Embedding
+You can also paste a Reddit url into the chat, the bot will transform it into a nice embedded message.
 
-You can also paste a reddit url into the chat, the bot will transform it into a nice embedded message.
-
-![reddit url embedding](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditurl.png)
+![reddit url embedding](https://github.com/CodeStix/reddit-discord-bot/raw/master2/images/urlpaste.gif)
 
 ## How it works
 
