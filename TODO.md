@@ -1,3 +1,3 @@
 - alias okbr -> okbuddyretard
 - support tiktok videos (eg https://vm.tiktok.com/ZMegmNgbd/)
-- encodeURI on youtube-dl command
+- update youtube-dl
