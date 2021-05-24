@@ -36,3 +36,9 @@ This bot is made with nodejs, ffmpeg, youtube-dl and redis.
 5. Store the current subreddit post index in the redis cache. (so the bot knows where to start looking for the next post)
 6. If video, use youtube-dl and ffmpeg to download and convert the video to mp4. If the video is larger than 8MB, compress the video using ffmpeg.
 7. Send the post in an embedded Discord message.
+
+## License
+
+Copyright 2020 Stijn Rogiest
+
+**Do not reupload this bot to any bot distribution website without permission. This repository only exists to create issues or pull requests.**
