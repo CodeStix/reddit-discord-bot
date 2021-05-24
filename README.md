@@ -2,6 +2,8 @@
 
 Browse Reddit using this Discord bot! It downloads video posts, leaves r/5050 images unspoiled and shows a comment section preview.
 
+[**Open an issue/request a feature**](https://github.com/CodeStix/reddit-discord-bot/issues/new)
+
 ![preview](https://github.com/CodeStix/reddit-discord-bot/raw/master2/images/videopreview.gif)
 
 <a href="https://top.gg/bot/711524405163065385">
