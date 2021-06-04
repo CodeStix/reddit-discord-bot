@@ -1,1 +1,3 @@
 - alias okbr -> okbuddyretard
+- support tiktok videos (eg https://vm.tiktok.com/ZMegmNgbd/)
+- update youtube-dl

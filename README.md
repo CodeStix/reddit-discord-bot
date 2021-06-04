@@ -1,16 +1,15 @@
-<a href="https://top.gg/bot/711524405163065385">
-    <img src="https://top.gg/api/widget/711524405163065385.svg" alt="Reddit" />
-</a>
-
 # reddit-discord-bot
 
-An amazing Discord bot that connects with reddit. Has video playback support, NSFW (and 50/50) spoilers ...
+Browse Reddit using this Discord bot! It downloads video posts, leaves r/5050 images unspoiled and shows a comment section preview.
 
-![preview](https://i.imgur.com/rvo6bwx.gif)
+[**Open an issue/request a feature**](https://github.com/CodeStix/reddit-discord-bot/issues/new)
 
-### Invite by clicking [here](https://discord.com/oauth2/authorize?client_id=711524405163065385&scope=bot&permissions=326720).
+![preview](https://github.com/CodeStix/reddit-discord-bot/raw/master2/images/videopreview.gif)
 
-
+<a href="https://top.gg/bot/711524405163065385">
+    <img src="https://top.gg/api/widget/711524405163065385.svg" alt="Reddit" />
+    <p>Click here to invite</p>
+</a>
 
 ## Usage
 
@@ -22,13 +21,11 @@ An amazing Discord bot that connects with reddit. Has video playback support, NS
 
 **To enable NSFW reddit content (e.g. r/fiftyfifty), you **MUST** mark the Discord channel as NSFW.**
 
-![bot prefix usage](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditprefix.png)
+## Reddit urls
 
-## Embedding
+You can also paste a Reddit url into the chat, the bot will transform it into a nice embedded message.
 
-You can also paste a reddit url into the chat, the bot will transform it into a nice embedded message.
-
-![reddit url embedding](https://github.com/CodeStix/reddit-discord-bot/raw/master/images/redditurl.png)
+![reddit url embedding](https://github.com/CodeStix/reddit-discord-bot/raw/master2/images/urlpaste.gif)
 
 ## How it works
 
@@ -41,3 +38,9 @@ This bot is made with nodejs, ffmpeg, youtube-dl and redis.
 5. Store the current subreddit post index in the redis cache. (so the bot knows where to start looking for the next post)
 6. If video, use youtube-dl and ffmpeg to download and convert the video to mp4. If the video is larger than 8MB, compress the video using ffmpeg.
 7. Send the post in an embedded Discord message.
+
+## License
+
+Copyright 2020 Stijn Rogiest
+
+**Do not reupload this bot to any bot distribution website without permission. This repository only exists to create issues or pull requests.**
