@@ -82,13 +82,13 @@ export class RedditBot extends EventEmitter {
 
             🔁 \u00A0 **\`${this.prefix}/\`**: repeat your previous input.
 
-            **To enable NSFW reddit content (e.g. r/fiftyfifty), you MUST mark the Discord channel as NSFW.**
+            **To enable NSFW reddit content (e.g. r/fiftyfifty), you must enable NSFW in the Discord channel settings.**
 
             **You can also paste a reddit url, I will convert it into a nice styled message.**
 
             ❤️ Thanks for using this bot! If you like it, you should consider [voting](https://top.gg/bot/711524405163065385).
 
-            [More information here](https://top.gg/bot/711524405163065385). Having issues? Report it [here](https://github.com/CodeStix/reddit-discord-bot/issues/new).           
+            Having issues? Report it [here](https://github.com/CodeStix/reddit-discord-bot/issues/new).           
         `);
     }
 
