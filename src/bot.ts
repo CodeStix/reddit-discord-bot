@@ -88,7 +88,7 @@ export class RedditBot extends EventEmitter {
 
             ❤️ Thanks for using this bot! If you like it, you should consider [voting](https://top.gg/bot/711524405163065385).
 
-            [More information here](https://top.gg/bot/711524405163065385)
+            [More information here](https://top.gg/bot/711524405163065385). Having issues? Report it [here](https://github.com/CodeStix/reddit-discord-bot/issues/new).           
         `);
     }
 
