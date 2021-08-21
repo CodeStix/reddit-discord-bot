@@ -8,6 +8,7 @@ ENV NODE_ENV="development"
 
 WORKDIR /app
 COPY . . 
+RUN yarn
 RUN yarn build
 RUN mkdir dist/cache dist/cache/ffmpeg dist/cache/videos
 
