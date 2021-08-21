@@ -15,10 +15,10 @@ export type RedditBotErrorType =
 export function createUnknownErrorEmbed(message?: string) {
     return new MessageEmbed()
         .setTitle("❌ Unknown problem")
-        .setDescription(
-            `Beep boop, the bot has self destructed, i hope a developer will look at this error message... ${message}`
-        )
-        .setFooter("This error got automatically submitted to the devs.");
+        .setDescription(`Beep boop, the bot has self destructed, i hope a developer will look at this error message... ${message}`)
+        .setFooter(
+            "If this keeps happening, or you think this is an issue, please [open an issue](https://github.com/CodeStix/reddit-discord-bot/issues/new)."
+        );
 }
 
 export class RedditBotError extends Error {
@@ -43,17 +43,11 @@ export class RedditBotError extends Error {
                     .setImage("https://github.com/CodeStix/reddit-discord-bot/raw/master/images/enable-nsfw.gif");
 
             case "banned-subreddit":
-                return new MessageEmbed()
-                    .setTitle(`❌ This subreddit has been banned by Reddit. 😠 ${this.message}`)
-                    .setColor("#FF4301");
+                return new MessageEmbed().setTitle(`❌ This subreddit has been banned by Reddit. 😠 ${this.message}`).setColor("#FF4301");
             case "private-subreddit":
-                return new MessageEmbed()
-                    .setTitle(`❌ This subreddit is private, I can't access it. 😢 ${this.message}`)
-                    .setColor("#FF4301");
+                return new MessageEmbed().setTitle(`❌ This subreddit is private, I can't access it. 😢 ${this.message}`).setColor("#FF4301");
             case "subreddit-not-found":
-                return new MessageEmbed()
-                    .setTitle(`❌ This subreddit was not found. Misspelled? ${this.message}`)
-                    .setColor("#FF4301");
+                return new MessageEmbed().setTitle(`❌ This subreddit was not found. Misspelled? ${this.message}`).setColor("#FF4301");
             case "unknown":
             case "unknown-fetch":
                 return createUnknownErrorEmbed(this.message);
