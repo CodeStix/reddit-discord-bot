@@ -1,4 +1,4 @@
-import { Client as DiscordBot, Message, MessageAttachment, MessageEmbed, MessageFlags, TextChannel, User } from "discord.js";
+import { Client as DiscordBot, Guild, Intents, Message, MessageAttachment, MessageEmbed, MessageFlags, TextChannel, User } from "discord.js";
 import { debug } from "debug";
 import { EventEmitter } from "events";
 import { SubredditMode, SUBREDDIT_MODES } from "./reddit";
@@ -39,7 +39,7 @@ export class RedditBot extends EventEmitter {
     constructor(token: string, prefix: string) {
         super();
         this.prefix = prefix;
-        this.bot = new DiscordBot();
+        this.bot = new DiscordBot({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MESSAGE_REACTIONS] });
         this.bot.once("ready", this.handleReady.bind(this));
         this.bot.on("message", this.handleMessage.bind(this));
         logger("connecting to Discord...");
@@ -58,11 +58,11 @@ export class RedditBot extends EventEmitter {
 
     private updatePresence() {
         logger("updating presence");
-        this.bot.user!.setPresence({ status: "online", activity: { type: "LISTENING", name: this.prefix } });
+        this.bot.user!.setPresence({ status: "online", activities: [{ type: "LISTENING", name: this.prefix }] });
     }
 
     private handleMessage(message: Message) {
-        if (message.channel.type !== "text" || message.author.bot) return;
+        if (message.channel.type !== "GUILD_TEXT" || message.author.bot) return;
         if (message.content.startsWith(this.prefix)) this.handleSubredditMessage(message);
         else if (message.content.startsWith("https://www.reddit.com/r/")) this.handleRedditUrlMessage(message);
     }
@@ -117,12 +117,14 @@ export class RedditBot extends EventEmitter {
         ) {
             logger("insufficient permissions for channel (%d)", message.channel.id);
             if (permissions.has("EMBED_LINKS")) {
-                message.channel.send(
-                    this.createErrorEmbed(
-                        "No Discord permissions",
-                        "You disabled my powers! Please allow me to **send messages**, **manage messages**, **embed links**, **add reactions** and **attach files**."
-                    )
-                );
+                message.channel.send({
+                    embeds: [
+                        this.createErrorEmbed(
+                            "No Discord permissions",
+                            "You disabled my powers! Please allow me to **send messages**, **manage messages**, **embed links**, **add reactions** and **attach files**."
+                        ),
+                    ],
+                });
             } else {
                 message.channel.send(
                     "You disabled my powers! Please allow me to **send messages**, **manage messages**, **embed links**, **add reactions** and **attach files**."
@@ -132,13 +134,15 @@ export class RedditBot extends EventEmitter {
         }
 
         if (!raw || raw === "help" || raw === "h" || raw === "?") {
-            message.channel.send(this.createHelpEmbed());
+            message.channel.send({ embeds: [this.createHelpEmbed()] });
             return;
         } else if (raw === "/") {
             // Repeat previous input
             let previous = await getPreviousInput(message.channel.id, message.author.id);
             if (!previous) {
-                message.channel.send(this.createWarningEmbed("I don't remember", "I don't remember your previous input, please type it yourself."));
+                message.channel.send({
+                    embeds: [this.createWarningEmbed("I don't remember", "I don't remember your previous input, please type it yourself.")],
+                });
                 return;
             }
             raw = previous;
@@ -149,7 +153,7 @@ export class RedditBot extends EventEmitter {
         let queryOrMode: SubredditMode | string = args.slice(1).join(" ").trim() || this.defaultMode;
 
         if (queryOrMode.length > 30) {
-            message.channel.send(this.createWarningEmbed("Please use a shorter search text.", ""));
+            message.channel.send({ embeds: [this.createWarningEmbed("Please use a shorter search text.", "")] });
             return;
         }
 
@@ -199,7 +203,7 @@ export class RedditBot extends EventEmitter {
         try {
             let urlName = this.getUrlName(url);
             let name = spoiler ? `SPOILER_${urlName}.png` : `image-${urlName}.png`;
-            await channel.send("", new MessageAttachment(url, name));
+            await channel.send({ files: [new MessageAttachment(url, name)] });
         } catch (ex) {
             logger("could not send as image, sending url instead:", ex);
             await channel.send(`⚠️ Could not upload to Discord, take a link instead: ${url}`);
@@ -211,12 +215,12 @@ export class RedditBot extends EventEmitter {
             let videoFile = await getVideoOrDownload(url);
             let urlName = this.getUrlName(url);
             let name = spoiler ? `SPOILER_${urlName}.mp4` : `video-${urlName}.mp4`;
-            await channel.send("", new MessageAttachment(videoFile, name));
+            await channel.send({ files: [new MessageAttachment(videoFile, name)] });
         } catch (ex) {
             if (ex instanceof RedditBotError) {
-                await channel.send(ex.createEmbed());
+                await channel.send({ embeds: [ex.createEmbed()] });
             } else {
-                await channel.send(createUnknownErrorEmbed("Could not download video"));
+                await channel.send({ embeds: [createUnknownErrorEmbed("Could not download video")] });
             }
         }
     }

@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 config(); // must load environment vars before anything else
-import { Client as DiscordBot, MessageEmbed, TextChannel } from "discord.js";
+import { Client as DiscordBot, ColorResolvable, MessageEmbed, TextChannel } from "discord.js";
 import { debug } from "debug";
 import { RedditBot, RedditUrlMessageHanlderProps, SubredditMessageHanlderProps } from "./bot";
 import {
@@ -66,17 +66,21 @@ bot.on("redditRequest", async ({ subreddit, queryOrMode, channel, sender }: Subr
 
     if (currentIndex === 0) {
         if (SUBREDDIT_MODES.includes(queryOrMode)) {
-            channel.send(
-                new MessageEmbed().setDescription(
-                    `You are browsing the **r/${subreddit}/${queryOrMode}** subreddit.\nUse \`${bot.prefix}/\` or repeat your input to get the next post.`
-                )
-            );
+            channel.send({
+                embeds: [
+                    new MessageEmbed().setDescription(
+                        `You are browsing the **r/${subreddit}/${queryOrMode}** subreddit.\nUse \`${bot.prefix}/\` or repeat your input to get the next post.`
+                    ),
+                ],
+            });
         } else {
-            channel.send(
-                new MessageEmbed().setDescription(
-                    `You are searching the **r/${subreddit}** subreddit with '_${queryOrMode}_'.\nUse \`${bot.prefix}/\` or repeat your input to get the next search result.`
-                )
-            );
+            channel.send({
+                embeds: [
+                    new MessageEmbed().setDescription(
+                        `You are searching the **r/${subreddit}** subreddit with '_${queryOrMode}_'.\nUse \`${bot.prefix}/\` or repeat your input to get the next search result.`
+                    ),
+                ],
+            });
         }
     }
 
@@ -86,10 +90,10 @@ bot.on("redditRequest", async ({ subreddit, queryOrMode, channel, sender }: Subr
     } catch (ex) {
         if (ex instanceof RedditBotError) {
             logger("bot error (%s): %s", ex.type, ex.message);
-            await channel.send(ex.createEmbed());
+            await channel.send({ embeds: [ex.createEmbed()] });
         } else {
             logger("unknown error", ex);
-            await channel.send(createUnknownErrorEmbed());
+            await channel.send({ embeds: [createUnknownErrorEmbed()] });
         }
         return;
     }
@@ -117,10 +121,10 @@ bot.on("redditUrl", async (props: RedditUrlMessageHanlderProps) => {
     } catch (ex) {
         if (ex instanceof RedditBotError) {
             logger("bot error (%s): %s", ex.type, ex.message);
-            await props.channel.send(ex.createEmbed());
+            await props.channel.send({ embeds: [ex.createEmbed()] });
         } else {
             logger("unknown error", ex);
-            await props.channel.send(createUnknownErrorEmbed());
+            await props.channel.send({ embeds: [createUnknownErrorEmbed()] });
         }
     }
 });
@@ -158,12 +162,12 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
     let embed = new MessageEmbed()
         .setTitle(truncateString(submission.title, TRUNCATE_TITLE_LENGTH))
         .setURL(urlToSubmission)
-        .setColor(cachedSubredditInfo?.color ?? DEFAULT_EMBED_COLOR)
+        .setColor((cachedSubredditInfo?.color ?? DEFAULT_EMBED_COLOR) as ColorResolvable)
         .setTimestamp(submission.created * 1000)
         .setDescription(descriptionBuilder)
         .setAuthor(submission.author, cachedUserIcon ?? getRandomDefaultUserIcon(), urlToAuthor)
         .setFooter(footerText, cachedSubredditInfo?.icon ?? undefined);
-    let firstSentMessage = channel.send(embed);
+    let firstSentMessage = channel.send({ embeds: [embed] });
 
     // Contains tasks that will edit the sent embed
     let embedTasks = [];
@@ -188,10 +192,10 @@ async function sendRedditSubmission(channel: TextChannel, submission: Submission
 
         embed.setDescription(descriptionBuilder);
         embed.setAuthor(submission.author, cachedUserIcon ?? getRandomDefaultUserIcon());
-        embed.setColor(cachedSubredditInfo?.color ?? DEFAULT_EMBED_COLOR);
+        embed.setColor((cachedSubredditInfo?.color ?? DEFAULT_EMBED_COLOR) as ColorResolvable);
         embed.setFooter(footerText, cachedSubredditInfo?.icon ?? undefined);
 
-        (await firstSentMessage).edit(embed);
+        (await firstSentMessage).edit({ embeds: [embed] });
     }
 
     if (otherTasks.length > 0) await Promise.all(otherTasks);
