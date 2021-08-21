@@ -30,6 +30,7 @@ export class RedditBot extends EventEmitter {
     public minUsageInterval: number = 1500;
     public aliases: Record<string, string> = {
         "5050": "fiftyfifty",
+        okbr: "okbuddyretard",
         mc: "minecraft",
     };
 

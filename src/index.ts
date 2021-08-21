@@ -367,6 +367,9 @@ function isVideoUrl(url: string): boolean {
         url.endsWith(".gif") ||
         url.endsWith(".gifv") ||
         url.endsWith(".mp4") ||
+        url.startsWith("https://www.tiktok.com/") ||
+        url.startsWith("https://tiktok.com/") ||
+        url.startsWith("https://vm.tiktok.com/") ||
         url.startsWith("https://v.redd.it/") ||
         url.startsWith("https://streamable.com/") ||
         url.startsWith("http://clips.twitch.tv/") ||
