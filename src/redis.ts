@@ -7,7 +7,7 @@ const logger = debug("rdb:redis");
 
 let redis = new RedisClient({
     url: process.env.REDIS_URL!,
-    port: parseInt(process.env.REDIS_PORT!),
+    port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT!) : undefined,
     host: process.env.REDIS_HOST!,
     password: process.env.REDIS_PASSWORD!,
     no_ready_check: true,
