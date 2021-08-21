@@ -6,6 +6,7 @@ import { CommentSortMode, Listing, RedditUser, Submission, SubredditMode } from 
 const logger = debug("rdb:redis");
 
 let redis = new RedisClient({
+    url: process.env.REDIS_URL!,
     port: parseInt(process.env.REDIS_PORT!),
     host: process.env.REDIS_HOST!,
     password: process.env.REDIS_PASSWORD!,
