@@ -1,6 +1,8 @@
 FROM node:16.7
 
-RUN apt install -y ffmpeg
+RUN apt update && apt install -y ffmpeg python
+RUN curl -L https://github.com/ytdl-org/youtube-dl/releases/latest/download/youtube-dl -o /usr/local/bin/youtube-dl
+RUN chmod +x /usr/local/bin/youtube-dl
 
 ENV NODE_ENV="development"
 
