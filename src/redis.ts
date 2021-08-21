@@ -1,15 +1,11 @@
-import { RedisClient } from "redis";
+import { RedisClient, createClient } from "redis";
 import { debug } from "debug";
 import util from "util";
 import { CommentSortMode, Listing, RedditUser, Submission, SubredditMode } from "./reddit";
 
 const logger = debug("rdb:redis");
 
-let redis = new RedisClient({
-    url: process.env.REDIS_URL!,
-    port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT!) : undefined,
-    host: process.env.REDIS_HOST!,
-    password: process.env.REDIS_PASSWORD!,
+let redis = createClient(process.env.REDIS_URL!, {
     no_ready_check: true,
     enable_offline_queue: false,
 });
